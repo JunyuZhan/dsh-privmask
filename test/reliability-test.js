@@ -200,5 +200,34 @@ t('M4 allow-图片原样放行', ra1.received !== null && ra1.received.messages[
 const rt1 = await Hi.run([{ type: 'tool-result', toolCallId: 'c1', content: [{ type: 'image', image: mB64 }] }]);
 t('M5 tool-result 内图片拦截', rt1.reason.kind === 'error' && rt1.received === null, JSON.stringify(rt1.reason));
 
+// N. 严格模式：未检查字段/异常默认拦截（failClosed 与 strictUnknown 默认开）
+function rawHarness(config) {
+  let listener = null;
+  let received = null;
+  const llmStub = { stream(o) { received = o; return (async function* () { yield { type: 'finish', reason: { kind: 'stop' } }; })(); } };
+  const ctx = { on(n, f) { if (n === 'llm/stream') listener = f; return () => {}; }, get(n) { return n === 'llm' ? llmStub : undefined; } };
+  apply(ctx, config);
+  return {
+    async run(options) {
+      received = null;
+      let reason = null;
+      const gen = listener(options, () => { received = options; return (async function* () { yield { type: 'finish', reason: { kind: 'stop' } }; })(); });
+      for await (const ev of gen) { if (ev.type === 'finish') reason = ev.reason; }
+      return { reason, received };
+    },
+  };
+}
+const HR = rawHarness({});
+const baseOpts = () => ({ provider: 't', model: 'm', sessionId: 's', messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }] });
+const nr1 = await HR.run({ ...baseOpts(), mystery: new (class UnknownThing {})() });
+t('N1 默认拦截未知非普通字段', nr1.reason.kind === 'error' && nr1.reason.failure && nr1.reason.failure.code === 'PRIVMASK_REDACTION_FAILED' && nr1.received === null, JSON.stringify(nr1.reason));
+const nr2 = await HR.run({ ...baseOpts(), extra: { note: '邮箱 ' + S.email } });
+t('N2 额外字段内容脱敏', nr2.received !== null && nr2.received.extra && nr2.received.extra.note.includes('[REDACTED_EMAIL_') && !nr2.received.extra.note.includes(S.email), JSON.stringify(nr2.received.extra));
+const HR2 = rawHarness({ strictUnknown: false });
+const nr3 = await HR2.run({ ...baseOpts(), mystery: new (class UnknownThing {})() });
+t('N3 strictUnknown=false 跳过未知字段', nr3.received !== null, JSON.stringify(nr3.reason));
+const nr4 = await HR.run({ ...baseOpts(), extraList: [S.email, '普通文本'] });
+t('N4 额外数组字段脱敏', nr4.received !== null && !nr4.received.extraList.includes(S.email) && nr4.received.extraList[0].includes('[REDACTED_EMAIL_'), JSON.stringify(nr4.received.extraList));
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exitCode = fail > 0 ? 1 : 0;

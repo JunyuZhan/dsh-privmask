@@ -14,6 +14,7 @@ export interface Config {
   dropSessionId?: boolean;
   cnEntities?: boolean;
   failClosed?: boolean;
+  strictUnknown?: boolean;
   logRedactions?: boolean;
 }
 
