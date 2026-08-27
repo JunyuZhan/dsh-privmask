@@ -96,6 +96,17 @@ node test/fuzz-test.js        # 600 例随机文本（不崩 + 幂等）
 
 CI（GitHub Actions，Node 18/20/22）会在每次 push / PR 时自动运行全部测试。
 
+## 工作机制（源码依据）
+
+基于 [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) 源码核对：
+
+- **拦截点**：`llm/stream` 水瀑是 dsh 唯一的请求边界（`packages/llm/llm/src/index.ts`），本插件挂在这里，脱敏发生在请求到达 adapter（云端边界）之前。
+- **上云范围**：adapter 序列化时只发送 `message.content` 内容块；消息的 `source` 元数据（notice 摘要、snapshot 片段、replayState）不会上云。
+- **reasoning 内容会上云**：adapter 把 `reasoning` 块序列化为 `reasoning_content` 发送，本插件同样脱敏。
+- **辅助调用也脱敏**：`purpose: compaction / session-title` 的请求同样经过 `llm/stream`，摘要生成等辅助调用同样被脱敏。
+- **会话头真实存在**：adapter 会发送 `x-deepseek-harness-session-id` 请求头（`packages/llm/llm-deepseek/src/adapter.ts`），`dropSessionId` 默认移除它。
+- **原请求保持不变**：agent-loop 的请求被深冻结并用 WeakSet 标记，本插件生成脱敏副本重入水瀑；原请求对象不修改，本地会话日志（session.events）保留原文。
+
 ## 注意事项
 
 - 脱敏对当前进程内**所有会话**的模型请求生效（`llm/stream` 是全局事件）。

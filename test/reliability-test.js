@@ -232,5 +232,92 @@ t('N3 strictUnknown=false 跳过未知字段', nr3.received !== null, JSON.strin
 const nr4 = await HR.run({ ...baseOpts(), extraList: [S.email, '普通文本'] });
 t('N4 额外数组字段脱敏', nr4.received !== null && !nr4.received.extraList.includes(S.email) && nr4.received.extraList[0].includes('[REDACTED_EMAIL_'), JSON.stringify(nr4.received.extraList));
 
+// O. 模拟真实 dsh 环境（深冻结 + agent-loop WeakSet 标记 + 不变式 + checkpoint 水瀑）
+function dshSimHarness(config) {
+  const hooks = [];
+  const AGENT_LOOP = new WeakSet();
+  let received = null;
+  let checkpointCount = 0;
+  let invariantFailures = [];
+
+  function deepFreeze(value, seen = new WeakSet()) {
+    if (value === null || typeof value !== 'object') return value;
+    if (value instanceof AbortSignal || seen.has(value)) return value;
+    seen.add(value);
+    Object.freeze(value);
+    for (const k of Object.keys(value)) deepFreeze(value[k], seen);
+    return value;
+  }
+
+  const llmStub = {
+    stream(options) {
+      // 只有真正到达 adapter（最内层）才记录，用于断言「未触达适配器」
+      const inner = () => {
+        received = options;
+        return (async function* () { yield { type: 'finish', reason: { kind: 'stop' } }; })();
+      };
+      const cbs = hooks.slice().map((r) => r.callback);
+      const runNext = () => {
+        const cb = cbs.shift();
+        return cb ? cb.call(null, options, runNext) : inner();
+      };
+      return runNext();
+    },
+  };
+  const ctx = {
+    on(name, fn, opts = {}) {
+      if (name !== 'llm/stream') return () => {};
+      const rec = { callback: fn };
+      if (opts.prepend) hooks.unshift(rec); else hooks.push(rec);
+      return () => {
+        const i = hooks.indexOf(rec);
+        if (i >= 0) hooks.splice(i, 1);
+      };
+    },
+    get(name) { return name === 'llm' ? llmStub : undefined; },
+  };
+  // 模拟 agent-loop/llm 不变式（prepend+global）：只校验被标记的原请求
+  ctx.on('llm/stream', (options, next) => {
+    if (!AGENT_LOOP.has(options)) return next();
+    if (!Object.isFrozen(options)) invariantFailures.push('request not frozen');
+    if (!Object.isFrozen(options.messages)) invariantFailures.push('messages not frozen');
+    return next();
+  }, { prepend: true });
+  // 模拟 checkpoint（在插件之前注册，带 sessionId 时包装 next）
+  ctx.on('llm/stream', (options, next) => {
+    if (options.sessionId === undefined) return next();
+    checkpointCount += 1;
+    return (async function* () { yield* next(); })();
+  });
+  apply(ctx, config);
+
+  return {
+    async run(options) {
+      received = null;
+      checkpointCount = 0;
+      invariantFailures = [];
+      const frozen = deepFreeze(options);
+      AGENT_LOOP.add(frozen);
+      const gen = llmStub.stream(frozen);
+      let reason = null;
+      for await (const ev of gen) { if (ev.type === 'finish') reason = ev.reason; }
+      return { reason, received, checkpointCount, invariantFailures, original: frozen };
+    },
+  };
+}
+const DS = dshSimHarness({});
+const baseDsh = () => ({ provider: 't', model: 'm', sessionId: 'sess-dsh', messages: [{ role: 'user', content: [{ type: 'text', text: '邮箱 ' + S.email }] }] });
+const od1 = await DS.run(baseDsh());
+t('O1 冻结原请求不变式通过', od1.invariantFailures.length === 0, JSON.stringify(od1.invariantFailures));
+t('O2 适配器收到脱敏副本', od1.received !== null && od1.received !== od1.original && od1.received.messages[0].content[0].text.includes('[REDACTED_EMAIL_') && !od1.received.messages[0].content[0].text.includes(S.email), JSON.stringify(od1.received.messages[0].content[0].text));
+t('O3 会话头被移除', od1.received.sessionId === undefined);
+t('O4 checkpoint 只跑一次', od1.checkpointCount === 1, 'count=' + od1.checkpointCount);
+t('O5 原请求保持原文且仍冻结', od1.original.messages[0].content[0].text.includes(S.email) && Object.isFrozen(od1.original) && Object.isFrozen(od1.original.messages), od1.original.messages[0].content[0].text);
+const od2 = await DS.run({ ...baseDsh(), purpose: 'compaction' });
+t('O6 compaction 调用同样脱敏', od2.received !== null && od2.received.messages[0].content[0].text.includes('[REDACTED_EMAIL_'), od2.received.messages[0].content[0].text);
+const DS2 = dshSimHarness({});
+const od3 = await DS2.run({ ...baseDsh(), mystery: new (class UnknownThing {})() });
+t('O7 严格模式异常→错误流且不触达适配器', od3.reason.kind === 'error' && od3.reason.failure && od3.reason.failure.code === 'PRIVMASK_REDACTION_FAILED' && od3.received === null, JSON.stringify(od3.reason));
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exitCode = fail > 0 ? 1 : 0;
