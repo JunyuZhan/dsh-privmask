@@ -61,6 +61,7 @@ dsh plugin --profile web add github:JunyuZhan/dsh-privmask
 | `cnEntities` | `true` | 中文实体识别 |
 | `redactPaths` | `false` | 绝对路径脱敏（会破坏文件工具的路径回传） |
 | `redactToolMeta` | `true` | 工具描述/参数 schema 脱敏（关闭可避免工具描述被占位符替换，利于模型理解工具用途） |
+| `persistMapping` | `true` | 同一会话内跨请求保持同一值映射同一占位符（利于模型跨轮关联实体；关闭则每请求重新编号） |
 | `longTokens` | `true` | 长 hex/base64 串脱敏 |
 | `dropSessionId` | `true` | 移除会话关联头 |
 | `failClosed` | `false` | 脱敏异常时拒绝请求（true）或放行原文（false） |
@@ -71,7 +72,7 @@ dsh plugin --profile web add github:JunyuZhan/dsh-privmask
 把本插件实际输出的占位符文本交给大模型处理，验证结论：
 
 - **结构级理解可用**：类别令牌（NAME/ID18/CASE…）+ 保留的角色词/上下文词（原告、身份证号、案号），模型能准确推断每类占位符的信息类型；
-- **同值关联可用**：同一请求内同类值映射同一占位符，模型能据此建立跨句实体关联（如两处 EMAIL_1 指向同一邮箱）；
+- **同值关联可用**：同一会话内同类值映射同一占位符（跨请求也保持），模型能据此建立跨句、跨轮实体关联（如两处 EMAIL_1 指向同一邮箱）；
 - **精确值任务降级**：姓名、金额、案号等具体数值被脱敏后，任务从"精确执行"降级为"结构复述"，涉及身份核验、管辖判断的任务需人工补值；
 - **工具链边界**：模型无法回传真实路径执行本地操作，故默认关闭（redactPaths: false）；若工具描述含敏感词影响函数调用，可关闭 redactToolMeta。
 

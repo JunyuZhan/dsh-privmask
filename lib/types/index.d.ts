@@ -8,6 +8,7 @@ export interface Config {
   enabled?: boolean;
   redactPaths?: boolean;
   redactToolMeta?: boolean;
+  persistMapping?: boolean;
   longTokens?: boolean;
   dropSessionId?: boolean;
   cnEntities?: boolean;

@@ -111,9 +111,13 @@ t('F5 路径脱敏开', (await H6.dispatch('/Users/alice/secret.txt')).includes(
 const HA = makeHarness({});
 const g1 = await HA.dispatch('邮箱 ' + S.email);
 const g2 = await HA.dispatch('邮箱 ' + 'bob.wang@' + 'privmask-test.com');
-t('G1 各自映射', g1.includes(P('EMAIL', 1)) && g2.includes(P('EMAIL', 1)));
+t('G1 同会话顺序编号', g1.includes(P('EMAIL', 1)) && g2.includes(P('EMAIL', 2)));
 const g3 = await HA.dispatch('邮箱 ' + S.email);
 t('G2 同值复现同号', g3.includes(P('EMAIL', 1)));
+const HB = makeHarness({ persistMapping: false });
+const gb1 = await HB.dispatch('邮箱 ' + S.email);
+const gb2 = await HB.dispatch('邮箱 ' + 'bob.wang@' + 'privmask-test.com');
+t('G3 关闭持久映射-各自重新编号', gb1.includes(P('EMAIL', 1)) && gb2.includes(P('EMAIL', 1)));
 
 // H. 性能
 const big = ('联系 ' + S.email + ' 和 ' + S.phone + ' 密钥 ' + S.sk + '\n').repeat(5000);
@@ -136,10 +140,32 @@ const coName = cn(0x6df1, 0x5733, 0x5e02, 0x5357, 0x5c71, 0x79d1, 0x6280, 0x6709
 const toolWithMeta = (desc) => [{ type: 'function', name: 'lookup', description: desc, parameters: { type: 'object', properties: { q: { type: 'string', description: '公司名' } } } }];
 const H8 = makeHarness({});
 await H8.dispatch('查', { tools: toolWithMeta('查询' + coName + '的工商信息') });
-t('J1 默认脱敏工具描述', H8.received.tools[0].description.includes('[REDACTED_COMPANY_') && !H8.received.tools[0].description.includes(coName), H8.received.tools[0].description);
+t('J1 默认脱敏工具描述-查询保留', H8.received.tools[0].description.includes('查询') && H8.received.tools[0].description.includes('[REDACTED_COMPANY_') && !H8.received.tools[0].description.includes(coName), H8.received.tools[0].description);
 const H9 = makeHarness({ redactToolMeta: false });
 await H9.dispatch('查', { tools: toolWithMeta('查询' + coName + '的工商信息') });
 t('J2 关闭工具元信息脱敏', H9.received.tools[0].description.includes(coName), H9.received.tools[0].description);
+
+// K. 动词不吞（公司/机关）+ AWS 密钥
+const courtName = cn(0x5317, 0x4eac, 0x5e02, 0x7b2c, 0x4e00, 0x4e2d, 0x7ea7, 0x4eba, 0x6c11, 0x6cd5, 0x9662); // [司法机关_1]
+const rk1 = await H.dispatch('查询' + coName + '的工商信息');
+t('K1 公司名不吞查询', rk1.includes('查询') && rk1.includes('[REDACTED_COMPANY_') && !rk1.includes(coName), rk1);
+const rk2 = await H.dispatch('委托' + courtName + '代理');
+t('K2 机关不吞委托', rk2.includes('委托') && rk2.includes('[REDACTED_ORG_') && !rk2.includes(courtName), rk2);
+const rk3 = await H.dispatch('aws_secret_access_key=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY');
+t('K3 AWS secret key', rk3.includes('[REDACTED_KEY_') && !rk3.includes('wJalrXUtnFEMI'), rk3);
+
+// L. 跨请求占位符一致性（同会话同值同号）
+const email2 = 'bob.wang@' + 'privmask-test.com';
+const HL = makeHarness({});
+await HL.dispatch('邮箱 ' + S.email, { sessionId: 'sess-L' });
+const rl1 = await HL.dispatch('新邮箱 ' + email2 + ' 旧邮箱 ' + S.email, { sessionId: 'sess-L' });
+t('L1 同会话跨请求同值同号', rl1.includes('旧邮箱 [REDACTED_EMAIL_1]') && rl1.includes('新邮箱 [REDACTED_EMAIL_2]') && !rl1.includes(S.email) && !rl1.includes(email2), rl1);
+const rl2 = await HL.dispatch('邮箱 ' + S.email, { sessionId: 'sess-L2' });
+t('L2 不同会话独立编号', rl2.includes('[REDACTED_EMAIL_1]'), rl2);
+const HN = makeHarness({ persistMapping: false });
+await HN.dispatch('邮箱 ' + S.email, { sessionId: 'sess-N' });
+const rl3 = await HN.dispatch('新邮箱 ' + email2 + ' 旧邮箱 ' + S.email, { sessionId: 'sess-N' });
+t('L3 关闭持久映射-重新编号', rl3.includes('新邮箱 [REDACTED_EMAIL_1]') && rl3.includes('旧邮箱 [REDACTED_EMAIL_2]'), rl3);
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exitCode = fail > 0 ? 1 : 0;
