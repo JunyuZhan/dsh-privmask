@@ -122,5 +122,24 @@ await H.dispatch(big);
 const cost = Date.now() - t0;
 t('H1 性能-150KB', cost < 5000, cost + 'ms');
 
+// I. 姓名边界回归（漏检 / 吞字）
+const sfName = cn(0x5f20, 0x4e09, 0x4e30); // 张三丰
+const legal = await H.dispatch(S.yg + S.name1 + S.rw + S.bg + S.name2 + '的' + '行为违法');
+t('I1 姓名不吞字-认为/的行为保留', legal.includes(S.rw) && legal.includes('的' + '行为') && legal.includes('[REDACTED_NAME_') && !legal.includes(S.name1) && !legal.includes(S.name2), legal);
+const sanfeng = await H.dispatch('被告' + sfName + '的合同');
+t('I2 三字名+的（不漏检不吞的）', sanfeng.includes('[REDACTED_NAME_') && !sanfeng.includes(sfName) && sanfeng.includes('的'), sanfeng);
+const zsOnly = await H.dispatch(S.yg + S.name1 + '与' + '被告' + S.name2 + '协商');
+t('I3 姓名+与', zsOnly.includes('[REDACTED_NAME_') && zsOnly.includes('与') && !zsOnly.includes(S.name1) && !zsOnly.includes(S.name2), zsOnly);
+
+// J. 工具元信息脱敏配置
+const coName = cn(0x6df1, 0x5733, 0x5e02, 0x5357, 0x5c71, 0x79d1, 0x6280, 0x6709, 0x9650, 0x516c, 0x53f8); // 深圳市南山科技有限公司
+const toolWithMeta = (desc) => [{ type: 'function', name: 'lookup', description: desc, parameters: { type: 'object', properties: { q: { type: 'string', description: '公司名' } } } }];
+const H8 = makeHarness({});
+await H8.dispatch('查', { tools: toolWithMeta('查询' + coName + '的工商信息') });
+t('J1 默认脱敏工具描述', H8.received.tools[0].description.includes('[REDACTED_COMPANY_') && !H8.received.tools[0].description.includes(coName), H8.received.tools[0].description);
+const H9 = makeHarness({ redactToolMeta: false });
+await H9.dispatch('查', { tools: toolWithMeta('查询' + coName + '的工商信息') });
+t('J2 关闭工具元信息脱敏', H9.received.tools[0].description.includes(coName), H9.received.tools[0].description);
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exitCode = fail > 0 ? 1 : 0;

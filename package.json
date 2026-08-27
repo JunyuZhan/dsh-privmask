@@ -29,5 +29,8 @@
     "redaction",
     "desensitization",
     "llm"
-  ]
+  ],
+  "scripts": {
+    "prepublishOnly": "node test/self-test.js && node test/reliability-test.js && node test/fuzz-test.js"
+  }
 }

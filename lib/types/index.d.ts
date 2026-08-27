@@ -7,6 +7,7 @@ export declare const name: 'privmask';
 export interface Config {
   enabled?: boolean;
   redactPaths?: boolean;
+  redactToolMeta?: boolean;
   longTokens?: boolean;
   dropSessionId?: boolean;
   cnEntities?: boolean;
