@@ -1,5 +1,8 @@
 # dsh-privmask
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/JunyuZhan/dsh-privmask/actions/workflows/test.yml/badge.svg)](https://github.com/JunyuZhan/dsh-privmask/actions/workflows/test.yml)
+
 DeepSeek Harness **本地脱敏插件**（Host-only 静态版）：在 `llm/stream` 出口拦截每一次发往云端大模型的请求，把密钥、PII、中文实体替换为 `[REDACTED_类别_N]` 占位符后再放行。**本地会话日志与工具执行不受影响**——云端只看到脱敏内容。
 
 ## 功能
@@ -9,20 +12,28 @@ DeepSeek Harness **本地脱敏插件**（Host-only 静态版）：在 `llm/stre
 | 密钥/Token | PEM 私钥、JWT、`sk-`/`ghp_`/`AKIA`/`xox`、`Bearer`/`Basic`、`API_KEY=xxx` 等 |
 | PII | 邮箱、电话（含 `+86` 国际格式）、IPv4、IPv6、长 hex/base64 串 |
 | 中文实体 | 姓名（角色上下文+姓氏库）、身份证 18/15 位、统一社会信用代码、手机/座机、银行卡（Luhn）、案号、车牌、护照/证件、出生日期、地址、公司名、司法机关 |
-| 防误伤 | `认为/请求` 不当姓名、`该公司/企业` 泛称不脱敏、`向人民法院` 介词结构不误伤 |
+| 防误伤 | `认为/请求` 不当姓名、`该公司/企业` 泛称不脱敏、`向[司法机关_6]` 介词结构不误伤 |
 | 会话关联 | 移除 `x-deepseek-harness-session-id` 请求头（可关） |
 
 ## 安装
 
-npm 包发布后：
+### 从 GitHub 安装（推荐）
+
+```sh
+dsh plugin --profile web add github:JunyuZhan/dsh-privmask
+```
+
+### 从 npm 安装（可选，待发布）
+
+包名 `dsh-privmask` 已确认未被占用，发布后可直接安装：
 
 ```sh
 dsh plugin --profile web add dsh-privmask
-# 或直接从 GitHub 安装
-dsh plugin --profile web add github:yourname/dsh-privmask
 ```
 
-然后编辑 `$DSH_HOME/profiles/web/cordis.patch.yml` 挂载：
+### 挂载
+
+编辑 `$DSH_HOME/profiles/web/cordis.patch.yml`：
 
 ```yaml
 - id: privmask
@@ -50,25 +61,6 @@ dsh plugin --profile web add github:yourname/dsh-privmask
 | `failClosed` | `false` | 脱敏异常时拒绝请求（true）或放行原文（false） |
 | `logRedactions` | `true` | 每次脱敏打印一行统计日志 |
 
-## 测试
-
-```sh
-node test/self-test.js
-```
-
-自测脚本模拟最小 Cordis 上下文，验证拦截器把测试请求脱敏后再交给 adapter（云端边界）。
-
-## 注意事项
-
-- 脱敏对当前进程内**所有会话**的模型请求生效（`llm/stream` 是全局事件）。
-- 同一次请求内，同一密钥映射到同一占位符，模型仍能理解引用关系。
-- 路径脱敏默认关闭：agent 需要真实路径才能操作本地文件，开启后工具链会断裂。
-- 本地会话日志始终保留原文，云端不可逆地只能看到占位符。
-
-## License
-
-MIT
-
 ## 脱敏后的语义可用性（已用真实模型验证）
 
 把本插件实际输出的占位符文本交给大模型处理，验证结论：
@@ -81,15 +73,29 @@ MIT
 ## 测试
 
 ```sh
-node test/self-test.js       # 14 项功能回归（端到端拦截 + 中文实体）
-node test/reliability-test.js # 28 项可靠性（边界/幂等/防误伤/校验拒绝/配置/并发/性能）
+node test/self-test.js        # 14 项功能回归（端到端拦截 + 中文实体）
+node test/reliability-test.js # 33 项可靠性（边界/幂等/防误伤/校验拒绝/配置/姓名边界/性能）
 node test/fuzz-test.js        # 600 例随机文本（不崩 + 幂等）
 ```
 
-## npm 发布（可选，GitHub 直装已够用）
+CI（GitHub Actions，Node 18/20/22）会在每次 push / PR 时自动运行全部测试。
 
-```sh
-npm login        # 若提示需要 2FA：先在 npmjs.com 账户设置启用二次验证
-npm publish      # 包名 dsh-privmask（已确认未被占用）
-```
-发布后使用方改为：`dsh plugin --profile web add dsh-privmask`
+## 注意事项
+
+- 脱敏对当前进程内**所有会话**的模型请求生效（`llm/stream` 是全局事件）。
+- 同一次请求内，同一密钥映射到同一占位符，模型仍能理解引用关系。
+- 路径脱敏默认关闭：agent 需要真实路径才能操作本地文件，开启后工具链会断裂。
+- 本地会话日志始终保留原文，云端不可逆地只能看到占位符。
+- 中文姓名/公司识别基于启发式规则，复杂句式下仍可能漏检或误伤，欢迎反馈用例。
+
+## 开源协作
+
+MIT 协议开源，代码仓库：[github.com/JunyuZhan/dsh-privmask](https://github.com/JunyuZhan/dsh-privmask)
+
+- 发现漏检/误伤或功能建议：提交 [Issue](https://github.com/JunyuZhan/dsh-privmask/issues)
+- 改进规则或修复 bug：提交 [PR](https://github.com/JunyuZhan/dsh-privmask/pulls)
+- 发布到 npm（可选）：`npm login && npm publish`（`prepublishOnly` 会先跑全部测试，通过才允许发布）
+
+## License
+
+MIT © 2026 JunyuZhan
