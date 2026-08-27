@@ -1,5 +1,6 @@
 # dsh-privmask
 
+[![npm version](https://img.shields.io/npm/v/dsh-privmask)](https://www.npmjs.com/package/dsh-privmask)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![CI](https://github.com/JunyuZhan/dsh-privmask/actions/workflows/test.yml/badge.svg)](https://github.com/JunyuZhan/dsh-privmask/actions/workflows/test.yml)
 
@@ -17,18 +18,22 @@ DeepSeek Harness **本地脱敏插件**（Host-only 静态版）：在 `llm/stre
 
 ## 安装
 
-### 从 GitHub 安装（推荐）
-
-```sh
-dsh plugin --profile web add github:JunyuZhan/dsh-privmask
-```
-
-### 从 npm 安装（可选，待发布）
-
-包名 `dsh-privmask` 已确认未被占用，发布后可直接安装：
+### 从 npm 安装（推荐）
 
 ```sh
 dsh plugin --profile web add dsh-privmask
+```
+
+或作为依赖直接安装：
+
+```sh
+npm install dsh-privmask
+```
+
+### 从 GitHub 安装（备选）
+
+```sh
+dsh plugin --profile web add github:JunyuZhan/dsh-privmask
 ```
 
 ### 挂载
@@ -94,7 +99,7 @@ MIT 协议开源，代码仓库：[github.com/JunyuZhan/dsh-privmask](https://gi
 
 - 发现漏检/误伤或功能建议：提交 [Issue](https://github.com/JunyuZhan/dsh-privmask/issues)
 - 改进规则或修复 bug：提交 [PR](https://github.com/JunyuZhan/dsh-privmask/pulls)
-- 发布到 npm（可选）：`npm login && npm publish`（`prepublishOnly` 会先跑全部测试，通过才允许发布）
+- 已发布到 [npm](https://www.npmjs.com/package/dsh-privmask)；发布新版本：`npm login && npm publish`（`prepublishOnly` 会先跑全部测试，通过才允许发布）
 
 ## License
 
