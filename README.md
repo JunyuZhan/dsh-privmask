@@ -70,7 +70,7 @@ dsh plugin --profile web remove dsh-privmask
 | `redactPaths` | `false` | 绝对路径脱敏（会破坏文件工具的路径回传） |
 | `redactToolMeta` | `true` | 工具描述/参数 schema 脱敏（关闭可避免工具描述被占位符替换，利于模型理解工具用途） |
 | `persistMapping` | `true` | 同一会话内跨请求保持同一值映射同一占位符（利于模型跨轮关联实体；关闭则每请求重新编号） |
-| `nonTextPolicy` | `block` | 非文本内容（图片/文件块）策略：`block`=拒绝请求、`strip`=移除后放行、`allow`=原样透传 |
+| `nonTextPolicy` | `strip` | 非文本内容（图片/文件块）策略：`strip`=移除后放行（默认，图片字节不出本地）、`block`=拒绝请求、`allow`=原样透传（仅本地 OCR 转文字的场景可考虑） |
 | `longTokens` | `true` | 长 hex/base64 串脱敏 |
 | `dropSessionId` | `true` | 移除会话关联头 |
 | `failClosed` | `true` | 严格模式：脱敏异常时拒绝请求，绝不把未脱敏数据发往云端 |
@@ -102,8 +102,8 @@ CI（GitHub Actions，Node 18/20/22）会在每次 push / PR 时自动运行全�
 - 同一会话内（跨请求）同一值映射到同一占位符，模型能理解引用关系。
 - 路径脱敏默认关闭：agent 需要真实路径才能操作本地文件，开启后工具链会断裂。
 - 本地会话日志始终保留原文，云端不可逆地只能看到占位符。
-- **严格模式（默认）**：脱敏异常（failClosed）、非文本内容（nonTextPolicy）、未检查字段（strictUnknown）都会**拒绝请求**，保证敏感数据不出本地；如需放宽请显式修改配置并自行承担风险。
-- **脱敏边界（务必知晓）**：本插件只处理**文本**内容。图片/文件等非文本块默认直接拦截（`nonTextPolicy: block`）；若设为 `allow`，图片字节会原样发往云端——截图、扫描件、照片中的文字与信息不会被脱敏。文件名与路径默认保留（`redactPaths: false`）。
+- **严格模式（默认）**：脱敏异常（failClosed）与未检查字段（strictUnknown）会**拒绝请求**；非文本内容默认**剥离**（nonTextPolicy=strip，图片字节不出本地，请求照常处理）。放宽选项均需显式配置。
+- **脱敏边界（务必知晓）**：本插件只处理**文本**内容。常规路径下 dsh 通过本地 OCR 把图片转成文字再发送，文字会被脱敏；若启用 DeepSeek 多模态（如 deepseek-v4-flash-vision-exp）直发图片，图片块会按 `nonTextPolicy` 处理（默认剥离，设 `allow` 才会原样上传）。文件名与路径默认保留（`redactPaths: false`）。
 - 中文姓名/公司识别基于启发式规则，复杂句式下仍可能漏检或误伤，欢迎反馈用例。
 
 ## 开源协作
