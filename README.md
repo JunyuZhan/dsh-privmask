@@ -36,6 +36,14 @@ npm install dsh-privmask
 dsh plugin --profile web add github:JunyuZhan/dsh-privmask
 ```
 
+### 卸载
+
+```sh
+dsh plugin --profile web remove dsh-privmask
+```
+
+卸载后重启 Web 服务生效；若你曾在 `cordis.patch.yml` 中手动挂载过本插件，请同时删除对应行。
+
 ### 挂载
 
 编辑 `$DSH_HOME/profiles/web/cordis.patch.yml`：
@@ -62,6 +70,7 @@ dsh plugin --profile web add github:JunyuZhan/dsh-privmask
 | `redactPaths` | `false` | 绝对路径脱敏（会破坏文件工具的路径回传） |
 | `redactToolMeta` | `true` | 工具描述/参数 schema 脱敏（关闭可避免工具描述被占位符替换，利于模型理解工具用途） |
 | `persistMapping` | `true` | 同一会话内跨请求保持同一值映射同一占位符（利于模型跨轮关联实体；关闭则每请求重新编号） |
+| `nonTextPolicy` | `block` | 非文本内容（图片/文件块）策略：`block`=拒绝请求、`strip`=移除后放行、`allow`=原样透传 |
 | `longTokens` | `true` | 长 hex/base64 串脱敏 |
 | `dropSessionId` | `true` | 移除会话关联头 |
 | `failClosed` | `false` | 脱敏异常时拒绝请求（true）或放行原文（false） |
@@ -89,9 +98,10 @@ CI（GitHub Actions，Node 18/20/22）会在每次 push / PR 时自动运行全�
 ## 注意事项
 
 - 脱敏对当前进程内**所有会话**的模型请求生效（`llm/stream` 是全局事件）。
-- 同一次请求内，同一密钥映射到同一占位符，模型仍能理解引用关系。
+- 同一会话内（跨请求）同一值映射到同一占位符，模型能理解引用关系。
 - 路径脱敏默认关闭：agent 需要真实路径才能操作本地文件，开启后工具链会断裂。
 - 本地会话日志始终保留原文，云端不可逆地只能看到占位符。
+- **脱敏边界（务必知晓）**：本插件只处理**文本**内容。图片/文件等非文本块默认直接拦截（`nonTextPolicy: block`）；若设为 `allow`，图片字节会原样发往云端——截图、扫描件、照片中的文字与信息不会被脱敏。文件名与路径默认保留（`redactPaths: false`）。
 - 中文姓名/公司识别基于启发式规则，复杂句式下仍可能漏检或误伤，欢迎反馈用例。
 
 ## 开源协作

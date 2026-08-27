@@ -9,6 +9,7 @@ export interface Config {
   redactPaths?: boolean;
   redactToolMeta?: boolean;
   persistMapping?: boolean;
+  nonTextPolicy?: 'block' | 'strip' | 'allow';
   longTokens?: boolean;
   dropSessionId?: boolean;
   cnEntities?: boolean;

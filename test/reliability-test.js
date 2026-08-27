@@ -167,5 +167,38 @@ await HN.dispatch('邮箱 ' + S.email, { sessionId: 'sess-N' });
 const rl3 = await HN.dispatch('新邮箱 ' + email2 + ' 旧邮箱 ' + S.email, { sessionId: 'sess-N' });
 t('L3 关闭持久映射-重新编号', rl3.includes('新邮箱 [REDACTED_EMAIL_1]') && rl3.includes('旧邮箱 [REDACTED_EMAIL_2]'), rl3);
 
+// M. 非文本内容策略（图片/文件块）
+const mB64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+function imageHarness(config) {
+  let listener = null;
+  let received = null;
+  const llmStub = { stream(o) { received = o; return (async function* () { yield { type: 'finish', reason: { kind: 'stop', via: 'stream' } }; })(); } };
+  const ctx = { on(n, f) { if (n === 'llm/stream') listener = f; return () => {}; }, get(n) { return n === 'llm' ? llmStub : undefined; } };
+  apply(ctx, config);
+  return {
+    async run(content) {
+      received = null;
+      const options = { provider: 't', model: 'm', messages: [{ role: 'user', content }] };
+      const gen = listener(options, () => { received = options; return (async function* () { yield { type: 'finish', reason: { kind: 'stop', via: 'next' } }; })(); });
+      let reason = null;
+      for await (const ev of gen) { if (ev.type === 'finish') reason = ev.reason; }
+      return { reason, received };
+    },
+  };
+}
+const Hi = imageHarness({});
+const ri1 = await Hi.run([{ type: 'text', text: '描述图片' }, { type: 'image', image: mB64 }]);
+t('M1 默认拦截图片块', ri1.reason.kind === 'error' && ri1.reason.failure && ri1.reason.failure.code === 'PRIVMASK_NON_TEXT_BLOCKED' && ri1.received === null, JSON.stringify(ri1.reason));
+const ri2 = await Hi.run([{ type: 'file', name: 'x.pdf', content: mB64 }]);
+t('M2 file 块同样拦截', ri2.reason.kind === 'error' && ri2.received === null, JSON.stringify(ri2.reason));
+const Hs = imageHarness({ nonTextPolicy: 'strip' });
+const rs1 = await Hs.run([{ type: 'text', text: '描述图片' }, { type: 'image', image: mB64 }]);
+t('M3 strip-移除图片块只留文本', rs1.received !== null && rs1.received.messages[0].content.length === 1 && rs1.received.messages[0].content[0].type === 'text', JSON.stringify(rs1.received.messages[0].content));
+const Ha = imageHarness({ nonTextPolicy: 'allow' });
+const ra1 = await Ha.run([{ type: 'text', text: '描述图片' }, { type: 'image', image: mB64 }]);
+t('M4 allow-图片原样放行', ra1.received !== null && ra1.received.messages[0].content.length === 2, JSON.stringify(ra1.received.messages[0].content.map((b) => b.type)));
+const rt1 = await Hi.run([{ type: 'tool-result', toolCallId: 'c1', content: [{ type: 'image', image: mB64 }] }]);
+t('M5 tool-result 内图片拦截', rt1.reason.kind === 'error' && rt1.received === null, JSON.stringify(rt1.reason));
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exitCode = fail > 0 ? 1 : 0;
