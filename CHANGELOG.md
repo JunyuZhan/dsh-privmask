@@ -3,6 +3,16 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.3] - 2026-08-28
+
+### 新增
+
+- 展示层还原：包装 `sessionController.page/follow`，浏览器读取会话时按会话映射还原占位符——界面显示原文（含用户自己的消息），落盘日志保持占位符；`restoreInbound: false` 时关闭
+
+### 测试
+
+- 可靠性测试 103 项（新增展示层还原 page/follow/开关 4 项）
+
 ## [0.2.2] - 2026-08-28
 
 ### 变更（隐私分类重构）
@@ -15,7 +25,6 @@
 - 日志脱敏（方案2）：`agent/pre-step` 改写用户消息、`tools/post-execute` 改写工具结果，两者在写入会话日志前遮罩为占位符；与 `llm/stream` 共用会话映射，编号一致
 - `nonTextPolicy: block` 下，图片/文件块在 `agent/pre-step` 直接拒绝步骤（不落盘不上云）
 - `tools/ptc-dispatch-log` 落盘遮罩（dsh ≥ 0.1.2）：run_code 子派发的 `tool/code-dispatch` 事件单独走此缝，同样在落盘前遮罩；`block` 策略下以安全标记替换日志副本
-- 展示层还原：包装 `sessionController.page/follow`，浏览器读取会话时按映射还原占位符——界面显示原文（含用户自己的消息），落盘日志保持占位符；`restoreInbound: false` 时关闭
 
 ### 修复
 
