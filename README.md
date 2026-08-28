@@ -88,7 +88,7 @@ npm install dsh-privmask
 | `persistMapping` | `true` | 同一会话内跨请求保持同一值映射同一占位符；关闭则每请求重新编号 |
 | `dropSessionId` | `true` | 移除 `x-deepseek-harness-session-id` 请求头 |
 | `failClosed` | `true` | 严格模式：脱敏异常时拒绝请求，绝不把未脱敏数据发往云端 |
-| `strictUnknown` | `true` | 严格模式：发现未检查的未知字段（非普通对象/函数等）时拒绝请求 |
+| `strictUnknown` | `true` | 严格模式：发现未检查的未知字段（含嵌套的非普通对象，如 Buffer/类实例）时拒绝请求 |
 | `logRedactions` | `true` | 每次脱敏打印一行统计日志 |
 
 ## 脱敏机制
@@ -122,14 +122,14 @@ npm install dsh-privmask
 - **启发式识别**：姓名/公司/地址等基于角色上下文、姓氏库与正则规则，复杂句式下可能漏检或误伤。
 - **身份证严格校验**：默认仅校验位合法的 18 位号码被脱敏；校验位错误的号码会被放行（避免误伤订单号），若来源数据可能被抄错/OCR 错位，可关闭 `strictId18`。
 - **文件名与路径默认保留**（`redactPaths: false`），开启后文件类工具链会断裂。
-- **内存映射**：占位符映射仅存于内存，进程重启后会话内映射即失效；云端侧不可逆，无法还原。
+- **内存映射**：占位符映射仅存于内存，进程重启后会话内映射即失效；单类别超过 2000 个不同值后最旧映射被逐出（编号不复用），被逐出的旧占位符不再还原；云端侧不可逆，无法还原。
 
 ## 测试与 CI
 
 ```sh
 node test/self-test.js        # 14 项功能回归（端到端拦截 + 中文实体）
-node test/reliability-test.js # 69 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/严格模式/入站还原/类别策略/性能）
-node test/fuzz-test.js        # 600 例随机文本（不崩 + 幂等）
+node test/reliability-test.js # 77 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/严格模式/入站还原/类别策略/性能/编号单调）
+node test/fuzz-test.js        # 300 例随机文本 × 2 断言（不崩 + 幂等，共 600 断言）
 ```
 
 CI（GitHub Actions，Node 18/20/22）在每次 push / PR 时自动运行全部测试。

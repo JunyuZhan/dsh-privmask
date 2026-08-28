@@ -145,6 +145,11 @@ const sanfeng = await Hf.dispatch('被告' + sfName + '的合同');
 t('I2 三字名+的（不漏检不吞的）', sanfeng.includes('[REDACTED_NAME_') && !sanfeng.includes(sfName) && sanfeng.includes('的'), sanfeng);
 const zsOnly = await Hf.dispatch(S.yg + S.name1 + '与' + '被告' + S.name2 + '协商');
 t('I3 姓名+与', zsOnly.includes('[REDACTED_NAME_') && zsOnly.includes('与') && !zsOnly.includes(S.name1) && !zsOnly.includes(S.name2), zsOnly);
+// 姓名排除判断曾使用 NAME_EXCLUDE.startsWith(first)（死代码），回归：方/任 等常见姓不得被误排除
+const rn1 = await Hf.dispatch('原告' + cn(0x65b9, 0x660e) + '的合同'); // 方明
+t('I4 姓氏方不误排除', rn1.includes('[REDACTED_NAME_') && !rn1.includes(cn(0x65b9, 0x660e)), rn1);
+const rn2 = await Hf.dispatch('被告' + cn(0x4efb, 0x5f3a) + '违约'); // 任强
+t('I5 姓氏任不误排除', rn2.includes('[REDACTED_NAME_') && !rn2.includes(cn(0x4efb, 0x5f3a)), rn2);
 
 // J. 工具元信息脱敏配置
 const coName = cn(0x6df1, 0x5733, 0x5e02, 0x5357, 0x5c71, 0x79d1, 0x6280, 0x6709, 0x9650, 0x516c, 0x53f8); // 深圳市南山科技有限公司
@@ -164,6 +169,13 @@ const rk2 = await Hf.dispatch('委托' + courtName + '代理');
 t('K2 机关不吞委托', rk2.includes('委托') && rk2.includes('[REDACTED_ORG_') && !rk2.includes(courtName), rk2);
 const rk3 = await H.dispatch('aws_secret_access_key=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY');
 t('K3 AWS secret key', rk3.includes('[REDACTED_KEY_') && !rk3.includes('wJalrXUtnFEMI'), rk3);
+// 公司识别：无地区/行业关键词的常见大公司（集团后缀 / 技术行业词）
+const coAlibaba = cn(0x963f, 0x91cc, 0x5df4, 0x5df4, 0x96c6, 0x56e2); // 阿里巴巴集团
+const coHuawei = cn(0x534e, 0x4e3a, 0x6280, 0x672f, 0x6709, 0x9650, 0x516c, 0x53f8); // 华为技术有限公司
+const rk4 = await Hf.dispatch('与' + coAlibaba + '签订合同');
+t('K4 集团后缀公司识别', rk4.includes('[REDACTED_COMPANY_') && !rk4.includes(coAlibaba), rk4);
+const rk5 = await Hf.dispatch('与' + coHuawei + '签订合同');
+t('K5 技术行业词公司识别', rk5.includes('[REDACTED_COMPANY_') && !rk5.includes(coHuawei), rk5);
 
 // L. 跨请求占位符一致性（同会话同值同号）
 const email2 = 'bob.wang@' + 'privmask-test.com';
@@ -242,6 +254,11 @@ const nr3 = await HR2.run({ ...baseOpts(), mystery: new (class UnknownThing {})(
 t('N3 strictUnknown=false 跳过未知字段', nr3.received !== null, JSON.stringify(nr3.reason));
 const nr4 = await HR.run({ ...baseOpts(), extraList: [S.email, '普通文本'] });
 t('N4 额外数组字段脱敏', nr4.received !== null && !nr4.received.extraList.includes(S.email) && nr4.received.extraList[0].includes('[REDACTED_EMAIL_'), JSON.stringify(nr4.received.extraList));
+const nr5 = await HR.run({ ...baseOpts(), extra: { buf: Buffer.from('sk-supersecretvalue123') } });
+t('N5 默认拦截嵌套非普通对象', nr5.reason.kind === 'error' && nr5.reason.failure && nr5.reason.failure.code === 'PRIVMASK_REDACTION_FAILED' && nr5.received === null, JSON.stringify(nr5.reason));
+const HR3 = rawHarness({ strictUnknown: false });
+const nr6 = await HR3.run({ ...baseOpts(), extra: { buf: Buffer.from('sk-supersecretvalue123') } });
+t('N6 strictUnknown=false 跳过嵌套非普通对象', nr6.received !== null, JSON.stringify(nr6.reason));
 
 // O. 模拟真实 dsh 环境（深冻结 + agent-loop WeakSet 标记 + 不变式 + checkpoint 水瀑）
 function dshSimHarness(config) {
@@ -391,6 +408,15 @@ const q5 = await Hq5.dispatch('密钥 ' + S.sk);
 t('Q5 关闭凭据脱敏-保留密钥', q5.includes(S.sk), q5);
 const q6 = await Hf.dispatch('原告 ' + S.name1 + '，被告 ' + S.name2);
 t('Q6 开启事实类-姓名脱敏', q6.includes('[REDACTED_NAME_') && !q6.includes(S.name1) && !q6.includes(S.name2), q6);
+
+// R. 占位符编号单调：单类别超过上限（2000）逐出最旧条目，编号绝不复用
+const HM = makeHarness({ logRedactions: false });
+const rEmail = (i) => 'mono' + i + '@privmask-test.com';
+let rlast = '';
+for (let i = 1; i <= 2001; i++) rlast = await HM.dispatch('邮箱 ' + rEmail(i));
+t('R1 超限后编号不复用', rlast.includes('[REDACTED_EMAIL_2001]') && !rlast.includes('[REDACTED_EMAIL_1]'), rlast);
+const rAgain = await HM.dispatch('邮箱 ' + rEmail(1));
+t('R2 旧值重新编号仍唯一', rAgain.includes('[REDACTED_EMAIL_2002]') && !rAgain.includes('[REDACTED_EMAIL_1]'), rAgain);
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exitCode = fail > 0 ? 1 : 0;
