@@ -518,5 +518,43 @@ const LTptcB = logMaskHarness({ logRedactions: false, nonTextPolicy: 'block' });
 const td12 = await LTptcB.ptcDispatch('sess-T', 'run_code', [{ type: 'image', image: 'aGVsbG8=' }]);
 t('T11 ptc-dispatch-log block-安全标记替换', td12.length === 1 && td12[0].text.includes('已拦截') && !td12[0].text.includes('aGVsbG8='), JSON.stringify(td12));
 
+// U. 展示层还原：包装 sessionController.page/follow，浏览器读取时还原占位符（日志仍为占位符）
+function displayHarness(config) {
+  let preStep = null;
+  const records = () => [
+    { type: 'event', event: { type: 'user/message', seq: 1, time: 1, data: { content: [{ type: 'text', text: '邮箱 [REDACTED_EMAIL_1]' }] } } },
+    { type: 'event', event: { type: 'assistant/message', seq: 2, time: 2, data: { message: { content: [{ type: 'text', text: '已记住 [REDACTED_EMAIL_1]' }] } } } },
+  ];
+  const fakeSC = {
+    page: async () => ({ records: records(), hasMore: false }),
+    follow: async function* () { yield { type: 'snapshot', records: records(), cursor: 0, header: {}, hasMore: false, projections: {} }; },
+  };
+  const ctx = {
+    on(name, fn) { if (name === 'agent/pre-step') preStep = fn; return () => {}; },
+    get(n) { return n === 'llm' ? { stream() { return (async function* () {})(); } } : n === 'sessionController' ? fakeSC : undefined; },
+  };
+  apply(ctx, config);
+  return {
+    async mask(sessionId, text) {
+      await preStep({ agent: { session: { id: sessionId } }, messages: [] }, async () => ({ kind: 'enter', messages: [{ role: 'user', content: [{ type: 'text', text }] }] }));
+    },
+    get sc() { return fakeSC; },
+  };
+}
+const DU = displayHarness({ logRedactions: false });
+await DU.mask('sess-U', '邮箱 display@privmask-test.com');
+const du1 = await DU.sc.page({ address: { kind: 'session', sessionId: 'sess-U' }, throughSeq: 0 });
+t('U1 展示层还原-用户消息', du1.records[0].event.data.content[0].text.includes('display@privmask-test.com') && !du1.records[0].event.data.content[0].text.includes('REDACTED_EMAIL_1'), JSON.stringify(du1.records[0].event.data.content[0].text));
+t('U2 展示层还原-assistant消息', du1.records[1].event.data.message.content[0].text.includes('display@privmask-test.com') && !du1.records[1].event.data.message.content[0].text.includes('REDACTED_EMAIL_1'), JSON.stringify(du1.records[1].event.data.message.content[0].text));
+let u3ok = false;
+for await (const f of DU.sc.follow({ address: { kind: 'session', sessionId: 'sess-U' } })) {
+  if (f.type === 'snapshot') u3ok = f.records[0].event.data.content[0].text.includes('display@privmask-test.com') && !f.records[0].event.data.content[0].text.includes('REDACTED_EMAIL_1');
+}
+t('U3 展示层还原-follow快照', u3ok);
+const DU2 = displayHarness({ logRedactions: false, restoreInbound: false });
+await DU2.mask('sess-U2', '邮箱 display@privmask-test.com');
+const du2 = await DU2.sc.page({ address: { kind: 'session', sessionId: 'sess-U2' }, throughSeq: 0 });
+t('U4 restoreInbound=false 展示不还原', du2.records[0].event.data.content[0].text.includes('REDACTED_EMAIL_1') && !du2.records[0].event.data.content[0].text.includes('display@privmask-test.com'), JSON.stringify(du2.records[0].event.data.content[0].text));
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exitCode = fail > 0 ? 1 : 0;
