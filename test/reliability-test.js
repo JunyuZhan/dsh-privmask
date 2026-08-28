@@ -329,5 +329,50 @@ const DS2 = dshSimHarness({});
 const od3 = await DS2.run({ ...baseDsh(), mystery: new (class UnknownThing {})() });
 t('O7 严格模式异常→错误流且不触达适配器', od3.reason.kind === 'error' && od3.reason.failure && od3.reason.failure.code === 'PRIVMASK_REDACTION_FAILED' && od3.received === null, JSON.stringify(od3.reason));
 
+// P. 入站还原：云端返回的占位符在本地还原为原值（响应/工具参数）
+function inboundHarness(config, cannedChunks) {
+  let listener = null;
+  let received = null;
+  const llmStub = {
+    stream(options) {
+      received = options;
+      return (async function* () {
+        for (const c of cannedChunks) yield c;
+      })();
+    },
+  };
+  const ctx = { on(n, f) { if (n === 'llm/stream') listener = f; return () => {}; }, get(n) { return n === 'llm' ? llmStub : undefined; } };
+  apply(ctx, config);
+  return {
+    async run(text, opts) {
+      received = null;
+      const options = { provider: 't', model: 'm', sessionId: 's', messages: [{ role: 'user', content: [{ type: 'text', text }] }], ...(opts || {}) };
+      const gen = listener(options, () => (async function* () { yield { type: 'finish', reason: { kind: 'stop' } }; })());
+      const out = [];
+      for await (const ev of gen) out.push(ev);
+      return { out, received };
+    },
+  };
+}
+const P_EMAIL = 'restore@privmask-test.com';
+const P_PH = '[REDACTED_EMAIL_1]';
+const P_canned = [
+  { type: 'text-delta', index: 0, text: '好的，邮箱 ' + P_PH + ' 已记住' },
+  { type: 'block-end', index: 0, block: { type: 'text', text: '好的，邮箱 ' + P_PH + ' 已记住' } },
+  { type: 'tool-call-delta', index: 1, id: 'c1', name: 'write_file', argumentsDelta: '{"content":"邮箱 ' + P_PH + '"}' },
+  { type: 'block-end', index: 1, block: { type: 'tool-call', id: 'c1', name: 'write_file', arguments: '{"content":"邮箱 ' + P_PH + '"}' } },
+  { type: 'finish', reason: { kind: 'stop' } },
+];
+const HI = inboundHarness({}, P_canned);
+const pi1 = await HI.run('邮箱 ' + P_EMAIL);
+const joined1 = pi1.out.map((c) => c.text || (c.block ? (c.block.text || c.block.arguments || '') : '')).join('|');
+t('P1 默认还原响应文本', !joined1.includes(P_PH) && joined1.includes(P_EMAIL), joined1);
+const toolArgs1 = pi1.out.find((c) => c.type === 'block-end' && c.block.type === 'tool-call').block.arguments;
+t('P2 默认还原工具参数', !toolArgs1.includes(P_PH) && toolArgs1.includes(P_EMAIL), toolArgs1);
+const HI2 = inboundHarness({ restoreInbound: false }, P_canned);
+const pi2 = await HI2.run('邮箱 ' + P_EMAIL);
+const joined2 = pi2.out.map((c) => c.text || (c.block ? (c.block.text || c.block.arguments || '') : '')).join('|');
+t('P3 关闭还原-保留占位符', joined2.includes(P_PH) && !joined2.includes(P_EMAIL), joined2);
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exitCode = fail > 0 ? 1 : 0;

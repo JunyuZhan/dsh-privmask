@@ -70,6 +70,7 @@ dsh plugin --profile web remove dsh-privmask
 | `dropSessionId` | `true` | 移除会话关联头 |
 | `failClosed` | `true` | 严格模式：脱敏异常时拒绝请求，绝不把未脱敏数据发往云端 |
 | `strictId18` | `true` | 身份证 18 位严格校验：仅校验位合法的号码脱敏（避免误伤订单号）；关闭后日期段合理或带「身份证号」上下文的号码也脱敏 |
+| `restoreInbound` | `true` | 入站还原：云端返回的占位符在本地还原为原值（响应显示/工具执行用）；下次出站会重新脱敏，云端始终看不到原值 |
 | `strictUnknown` | `true` | 严格模式：发现未检查的未知字段时拒绝请求（确认字段无敏感数据可关） |
 | `logRedactions` | `true` | 每次脱敏打印一行统计日志 |
 
@@ -102,6 +103,7 @@ CI（GitHub Actions，Node 18/20/22）会在每次 push / PR 时自动运行全�
 - **辅助调用也脱敏**：`purpose: compaction / session-title` 的请求同样经过 `llm/stream`，摘要生成等辅助调用同样被脱敏。
 - **会话头真实存在**：adapter 会发送 `x-deepseek-harness-session-id` 请求头（`packages/llm/llm-deepseek/src/adapter.ts`），`dropSessionId` 默认移除它。
 - **原请求保持不变**：agent-loop 的请求被深冻结并用 WeakSet 标记，本插件生成脱敏副本重入水瀑；原请求对象不修改，本地会话日志（session.events）保留原文。
+- **入站还原**：云端返回流中的占位符会按会话映射在**本地**还原为原值（模型回复显示、工具执行参数），还原后的内容再次出站时会被重新脱敏；云端不可逆地只能看到占位符。
 
 ## 注意事项
 
