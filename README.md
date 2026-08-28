@@ -72,6 +72,9 @@ dsh plugin --profile web remove dsh-privmask
 | `failClosed` | `true` | 严格模式：脱敏异常时拒绝请求，绝不把未脱敏数据发往云端 |
 | `strictId18` | `true` | 身份证 18 位严格校验：仅校验位合法的号码脱敏（避免误伤订单号）；关闭后日期段合理或带「身份证号」上下文的号码也脱敏 |
 | `restoreInbound` | `true` | 入站还原：云端返回的占位符在本地还原为原值（响应显示/工具执行用）；下次出站会重新脱敏，云端始终看不到原值 |
+| `redactCredentials` | `true` | 凭据类脱敏（PEM/JWT/API Key/密码等）：模型永远不需要，脱敏零损失 |
+| `redactAddress` | `true` | 地址类脱敏（省市区乡/住址[地址_24]默认开）：当事人隐私核心，起草文书靠入站还原写回真值 |
+| `redactFacts` | `false` | 事实类脱敏（姓名/案号/出生日期/公司/机关，默认关）：律师工作需真值保证精度；需要时可开启 |
 | `strictUnknown` | `true` | 严格模式：发现未检查的未知字段时拒绝请求（确认字段无敏感数据可关） |
 | `logRedactions` | `true` | 每次脱敏打印一行统计日志 |
 
@@ -89,7 +92,7 @@ dsh plugin --profile web remove dsh-privmask
 
 ```sh
 node test/self-test.js        # 14 项功能回归（端到端拦截 + 中文实体）
-node test/reliability-test.js # 63 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/严格模式/入站还原/性能）
+node test/reliability-test.js # 69 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/严格模式/入站还原/类别策略/性能）
 node test/fuzz-test.js        # 600 例随机文本（不崩 + 幂等）
 ```
 
@@ -114,6 +117,7 @@ CI（GitHub Actions，Node 18/20/22）会在每次 push / PR 时自动运行全�
 - 路径脱敏默认关闭：agent 需要真实路径才能操作本地文件，开启后工具链会断裂。
 - 本地会话日志始终保留原文，云端不可逆地只能看到占位符。
 - **严格模式（默认）**：脱敏异常（failClosed）与未检查字段（strictUnknown）会**拒绝请求**；非文本内容默认**剥离**（nonTextPolicy=strip，图片字节不出本地，请求照常处理）。放宽选项均需显式配置。
+- **律师模式（默认）**：凭据（redactCredentials）与地址（redactAddress）默认脱敏；事实类——姓名/案号/出生日期/公司/机关（redactFacts）默认**保留**，保证云端大模型能基于真值做金额核算、管辖判断等精确工作；涉案金额本就不脱敏。若需全面脱敏，将 `redactFacts: true`。
 - **脱敏边界（务必知晓）**：本插件只处理**文本**内容。常规路径下 dsh 通过本地 OCR 把图片转成文字再发送，文字会被脱敏；若启用 DeepSeek 多模态（如 deepseek-v4-flash-vision-exp）直发图片，图片块会按 `nonTextPolicy` 处理（默认剥离，设 `allow` 才会原样上传）。文件名与路径默认保留（`redactPaths: false`）。
 - 中文姓名/公司识别基于启发式规则，复杂句式下仍可能漏检或误伤，欢迎反馈用例。
 

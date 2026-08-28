@@ -56,7 +56,8 @@ const ctx = {
   },
 };
 
-apply(ctx, {}); // 默认配置
+// 全规则回归：开启事实类（姓名/公司/机关）——默认配置下事实类为保留
+apply(ctx, { redactFacts: true });
 
 const options = {
   provider: 'test',

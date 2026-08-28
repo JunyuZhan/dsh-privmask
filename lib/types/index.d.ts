@@ -15,6 +15,9 @@ export interface Config {
   cnEntities?: boolean;
   strictId18?: boolean;
   restoreInbound?: boolean;
+  redactCredentials?: boolean;
+  redactAddress?: boolean;
+  redactFacts?: boolean;
   failClosed?: boolean;
   strictUnknown?: boolean;
   logRedactions?: boolean;

@@ -137,18 +137,19 @@ const cost = Date.now() - t0;
 t('H1 性能-150KB', cost < 5000, cost + 'ms');
 
 // I. 姓名边界回归（漏检 / 吞字）
+const Hf = makeHarness({ redactFacts: true }); // 事实类开启时测试姓名/公司/机关规则
 const sfName = cn(0x5f20, 0x4e09, 0x4e30); // 张三丰
-const legal = await H.dispatch(S.yg + S.name1 + S.rw + S.bg + S.name2 + '的' + '行为违法');
+const legal = await Hf.dispatch(S.yg + S.name1 + S.rw + S.bg + S.name2 + '的' + '行为违法');
 t('I1 姓名不吞字-认为/的行为保留', legal.includes(S.rw) && legal.includes('的' + '行为') && legal.includes('[REDACTED_NAME_') && !legal.includes(S.name1) && !legal.includes(S.name2), legal);
-const sanfeng = await H.dispatch('被告' + sfName + '的合同');
+const sanfeng = await Hf.dispatch('被告' + sfName + '的合同');
 t('I2 三字名+的（不漏检不吞的）', sanfeng.includes('[REDACTED_NAME_') && !sanfeng.includes(sfName) && sanfeng.includes('的'), sanfeng);
-const zsOnly = await H.dispatch(S.yg + S.name1 + '与' + '被告' + S.name2 + '协商');
+const zsOnly = await Hf.dispatch(S.yg + S.name1 + '与' + '被告' + S.name2 + '协商');
 t('I3 姓名+与', zsOnly.includes('[REDACTED_NAME_') && zsOnly.includes('与') && !zsOnly.includes(S.name1) && !zsOnly.includes(S.name2), zsOnly);
 
 // J. 工具元信息脱敏配置
 const coName = cn(0x6df1, 0x5733, 0x5e02, 0x5357, 0x5c71, 0x79d1, 0x6280, 0x6709, 0x9650, 0x516c, 0x53f8); // 深圳市南山科技有限公司
 const toolWithMeta = (desc) => [{ type: 'function', name: 'lookup', description: desc, parameters: { type: 'object', properties: { q: { type: 'string', description: '公司名' } } } }];
-const H8 = makeHarness({});
+const H8 = makeHarness({ redactFacts: true });
 await H8.dispatch('查', { tools: toolWithMeta('查询' + coName + '的工商信息') });
 t('J1 默认脱敏工具描述-查询保留', H8.received.tools[0].description.includes('查询') && H8.received.tools[0].description.includes('[REDACTED_COMPANY_') && !H8.received.tools[0].description.includes(coName), H8.received.tools[0].description);
 const H9 = makeHarness({ redactToolMeta: false });
@@ -157,9 +158,9 @@ t('J2 关闭工具元信息脱敏', H9.received.tools[0].description.includes(co
 
 // K. 动词不吞（公司/机关）+ AWS 密钥
 const courtName = cn(0x5317, 0x4eac, 0x5e02, 0x7b2c, 0x4e00, 0x4e2d, 0x7ea7, 0x4eba, 0x6c11, 0x6cd5, 0x9662); // [司法机关_1]
-const rk1 = await H.dispatch('查询' + coName + '的工商信息');
+const rk1 = await Hf.dispatch('查询' + coName + '的工商信息');
 t('K1 公司名不吞查询', rk1.includes('查询') && rk1.includes('[REDACTED_COMPANY_') && !rk1.includes(coName), rk1);
-const rk2 = await H.dispatch('委托' + courtName + '代理');
+const rk2 = await Hf.dispatch('委托' + courtName + '代理');
 t('K2 机关不吞委托', rk2.includes('委托') && rk2.includes('[REDACTED_ORG_') && !rk2.includes(courtName), rk2);
 const rk3 = await H.dispatch('aws_secret_access_key=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY');
 t('K3 AWS secret key', rk3.includes('[REDACTED_KEY_') && !rk3.includes('wJalrXUtnFEMI'), rk3);
@@ -373,6 +374,23 @@ const HI2 = inboundHarness({ restoreInbound: false }, P_canned);
 const pi2 = await HI2.run('邮箱 ' + P_EMAIL);
 const joined2 = pi2.out.map((c) => c.text || (c.block ? (c.block.text || c.block.arguments || '') : '')).join('|');
 t('P3 关闭还原-保留占位符', joined2.includes(P_PH) && !joined2.includes(P_EMAIL), joined2);
+
+// Q. 类别级脱敏策略（律师模式默认：凭据/地址脱敏，事实类保留）
+const q1 = await H.dispatch('委托人 ' + S.name1 + ' 与 ' + S.name2 + ' 的合同纠纷');
+t('Q1 默认事实类保留-姓名不脱敏', q1.includes(S.name1) && q1.includes(S.name2), q1);
+const q2 = await H.dispatch('密钥 ' + S.sk);
+t('Q2 默认凭据脱敏', q2.includes('[REDACTED_KEY_') && !q2.includes(S.sk), q2);
+const qAddr = cn(0x4f4f, 0x5740, 0xff1a) + cn(0x5e7f, 0x4e1c, 0x7701, 0x6df1, 0x5733, 0x5e02, 0x5357, 0x5c71, 0x533a, 0x7ca4, 0x6d77, 0x8857, 0x9053); // 住址：广东省深圳市南山区粤海街道
+const q3 = await H.dispatch(qAddr);
+t('Q3 默认地址脱敏', q3.includes('[REDACTED_ADDR') && !q3.includes(cn(0x5e7f, 0x4e1c, 0x7701)), q3);
+const Hq4 = makeHarness({ redactAddress: false });
+const q4 = await Hq4.dispatch(qAddr);
+t('Q4 关闭地址脱敏-保留地址', q4.includes(cn(0x5e7f, 0x4e1c, 0x7701)), q4);
+const Hq5 = makeHarness({ redactCredentials: false });
+const q5 = await Hq5.dispatch('密钥 ' + S.sk);
+t('Q5 关闭凭据脱敏-保留密钥', q5.includes(S.sk), q5);
+const q6 = await Hf.dispatch('原告 ' + S.name1 + '，被告 ' + S.name2);
+t('Q6 开启事实类-姓名脱敏', q6.includes('[REDACTED_NAME_') && !q6.includes(S.name1) && !q6.includes(S.name2), q6);
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exitCode = fail > 0 ? 1 : 0;

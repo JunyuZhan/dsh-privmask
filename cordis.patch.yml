@@ -9,5 +9,8 @@
         redactPaths: false
         nonTextPolicy: strip
         dropSessionId: true
+        redactCredentials: true
+        redactAddress: true
+        redactFacts: false
         failClosed: true
         strictUnknown: true
