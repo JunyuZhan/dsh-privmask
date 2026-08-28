@@ -3,6 +3,17 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.4] - 2026-08-28
+
+### 修复
+
+- 展示层还原补充 `sessionController.control` 流：界面主视图订阅的是 control（host 级实时状态），其 baseline 与 queue 帧中的用户消息同样按会话还原
+- 安装诊断日志：成功/失败都会打印一行（定位服务不可用或加载顺序问题）
+
+### 测试
+
+- 可靠性测试 105 项（新增 control baseline/queue 还原 2 项）
+
 ## [0.2.3] - 2026-08-28
 
 ### 新增

@@ -528,6 +528,10 @@ function displayHarness(config) {
   const fakeSC = {
     page: async () => ({ records: records(), hasMore: false }),
     follow: async function* () { yield { type: 'snapshot', records: records(), cursor: 0, header: {}, hasMore: false, projections: {} }; },
+    control: async function* () {
+      yield { type: 'baseline', value: { queues: { 'sess-U': [{ id: 'q1', placement: 'queued', message: { id: 'q1', content: [{ type: 'text', text: '邮箱 [REDACTED_EMAIL_1]' }] } }] }, jobs: {}, projections: {} } };
+      yield { type: 'queue', sessionId: 'sess-U', items: [{ id: 'q2', placement: 'queued', message: { id: 'q2', content: [{ type: 'text', text: '邮箱 [REDACTED_EMAIL_1]' }] } }] };
+    },
   };
   const ctx = {
     on(name, fn) { if (name === 'agent/pre-step') preStep = fn; return () => {}; },
@@ -555,6 +559,13 @@ const DU2 = displayHarness({ logRedactions: false, restoreInbound: false });
 await DU2.mask('sess-U2', '邮箱 display@privmask-test.com');
 const du2 = await DU2.sc.page({ address: { kind: 'session', sessionId: 'sess-U2' }, throughSeq: 0 });
 t('U4 restoreInbound=false 展示不还原', du2.records[0].event.data.content[0].text.includes('REDACTED_EMAIL_1') && !du2.records[0].event.data.content[0].text.includes('display@privmask-test.com'), JSON.stringify(du2.records[0].event.data.content[0].text));
+let u5ok = false, u6ok = false;
+for await (const f of DU.sc.control()) {
+  if (f.type === 'baseline') u5ok = f.value.queues['sess-U'][0].message.content[0].text.includes('display@privmask-test.com');
+  if (f.type === 'queue') u6ok = f.items[0].message.content[0].text.includes('display@privmask-test.com') && !f.items[0].message.content[0].text.includes('REDACTED_EMAIL_1');
+}
+t('U5 展示层还原-control baseline队列', u5ok);
+t('U6 展示层还原-control queue帧', u6ok);
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exitCode = fail > 0 ? 1 : 0;
