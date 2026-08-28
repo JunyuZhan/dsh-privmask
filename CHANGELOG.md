@@ -3,6 +3,14 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.1] - 2026-08-28
+
+### 文档
+
+- 按开源规范重写 README（目录/特性/安装/快速开始/配置/脱敏机制/安全模型/已知限制/测试与 CI/贡献/发布/许可证）
+- 修复文档中误入的占位符样式文本
+- 新增 CHANGELOG.md；package.json 补齐 repository/homepage/bugs/engines 元数据
+
 ## [0.2.0] - 2026-08-28
 
 ### 新增
