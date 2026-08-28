@@ -137,7 +137,7 @@ const cost = Date.now() - t0;
 t('H1 性能-150KB', cost < 5000, cost + 'ms');
 
 // I. 姓名边界回归（漏检 / 吞字）
-const Hf = makeHarness({ redactFacts: true }); // 事实类开启时测试姓名/公司/机关规则
+const Hf = makeHarness({}); // 默认隐私配置（姓名/公司/机关脱敏）下测试
 const sfName = cn(0x5f20, 0x4e09, 0x4e30); // 张三丰
 const legal = await Hf.dispatch(S.yg + S.name1 + S.rw + S.bg + S.name2 + '的' + '行为违法');
 t('I1 姓名不吞字-认为/的行为保留', legal.includes(S.rw) && legal.includes('的' + '行为') && legal.includes('[REDACTED_NAME_') && !legal.includes(S.name1) && !legal.includes(S.name2), legal);
@@ -150,11 +150,17 @@ const rn1 = await Hf.dispatch('原告' + cn(0x65b9, 0x660e) + '的合同'); // �
 t('I4 姓氏方不误排除', rn1.includes('[REDACTED_NAME_') && !rn1.includes(cn(0x65b9, 0x660e)), rn1);
 const rn2 = await Hf.dispatch('被告' + cn(0x4efb, 0x5f3a) + '违约'); // 任强
 t('I5 姓氏任不误排除', rn2.includes('[REDACTED_NAME_') && !rn2.includes(cn(0x4efb, 0x5f3a)), rn2);
+const rn3 = await Hf.dispatch('原告 ' + S.name1 + ' 的合同');
+t('I6 上下文后带空格', rn3.includes('[REDACTED_NAME_') && !rn3.includes(S.name1), rn3);
+const rn4 = await Hf.dispatch('法定代表人是' + sfName);
+t('I7 系动词衔接', rn4.includes('[REDACTED_NAME_') && !rn4.includes(sfName), rn4);
+const rn5 = await Hf.dispatch('委托人：' + S.name2);
+t('I8 委托人角色词', rn5.includes('[REDACTED_NAME_') && !rn5.includes(S.name2), rn5);
 
 // J. 工具元信息脱敏配置
 const coName = cn(0x6df1, 0x5733, 0x5e02, 0x5357, 0x5c71, 0x79d1, 0x6280, 0x6709, 0x9650, 0x516c, 0x53f8); // 深圳市南山科技有限公司
 const toolWithMeta = (desc) => [{ type: 'function', name: 'lookup', description: desc, parameters: { type: 'object', properties: { q: { type: 'string', description: '公司名' } } } }];
-const H8 = makeHarness({ redactFacts: true });
+const H8 = makeHarness({});
 await H8.dispatch('查', { tools: toolWithMeta('查询' + coName + '的工商信息') });
 t('J1 默认脱敏工具描述-查询保留', H8.received.tools[0].description.includes('查询') && H8.received.tools[0].description.includes('[REDACTED_COMPANY_') && !H8.received.tools[0].description.includes(coName), H8.received.tools[0].description);
 const H9 = makeHarness({ redactToolMeta: false });
@@ -392,9 +398,9 @@ const pi2 = await HI2.run('邮箱 ' + P_EMAIL);
 const joined2 = pi2.out.map((c) => c.text || (c.block ? (c.block.text || c.block.arguments || '') : '')).join('|');
 t('P3 关闭还原-保留占位符', joined2.includes(P_PH) && !joined2.includes(P_EMAIL), joined2);
 
-// Q. 类别级脱敏策略（律师模式默认：凭据/地址脱敏，事实类保留）
-const q1 = await H.dispatch('委托人 ' + S.name1 + ' 与 ' + S.name2 + ' 的合同纠纷');
-t('Q1 默认事实类保留-姓名不脱敏', q1.includes(S.name1) && q1.includes(S.name2), q1);
+// Q. 类别级脱敏策略（默认：凭据/地址/姓名/公司/机关脱敏；案号/出生日期/金额保留）
+const q1 = await H.dispatch('原告 ' + S.name1 + ' 与 被告 ' + S.name2 + ' 的合同纠纷');
+t('Q1 默认姓名脱敏', q1.includes('[REDACTED_NAME_') && !q1.includes(S.name1) && !q1.includes(S.name2), q1);
 const q2 = await H.dispatch('密钥 ' + S.sk);
 t('Q2 默认凭据脱敏', q2.includes('[REDACTED_KEY_') && !q2.includes(S.sk), q2);
 const qAddr = cn(0x4f4f, 0x5740, 0xff1a) + cn(0x5e7f, 0x4e1c, 0x7701, 0x6df1, 0x5733, 0x5e02, 0x5357, 0x5c71, 0x533a, 0x7ca4, 0x6d77, 0x8857, 0x9053); // 住址：广东省深圳市南山区粤海街道
@@ -406,8 +412,25 @@ t('Q4 关闭地址脱敏-保留地址', q4.includes(cn(0x5e7f, 0x4e1c, 0x7701)),
 const Hq5 = makeHarness({ redactCredentials: false });
 const q5 = await Hq5.dispatch('密钥 ' + S.sk);
 t('Q5 关闭凭据脱敏-保留密钥', q5.includes(S.sk), q5);
-const q6 = await Hf.dispatch('原告 ' + S.name1 + '，被告 ' + S.name2);
-t('Q6 开启事实类-姓名脱敏', q6.includes('[REDACTED_NAME_') && !q6.includes(S.name1) && !q6.includes(S.name2), q6);
+const Hq6 = makeHarness({ redactNames: false });
+const q6 = await Hq6.dispatch('原告 ' + S.name1 + '，被告 ' + S.name2);
+t('Q6 关闭姓名脱敏-保留姓名', q6.includes(S.name1) && q6.includes(S.name2), q6);
+const q7 = await H.dispatch('与' + coName + '签订合同');
+t('Q7 默认公司脱敏', q7.includes('[REDACTED_COMPANY_') && !q7.includes(coName), q7);
+const q8 = await H.dispatch('向' + courtName + '起诉');
+t('Q8 默认机关脱敏', q8.includes('[REDACTED_ORG_') && !q8.includes(courtName), q8);
+const qCase = '（2024）粤01民初123号';
+const q9 = await H.dispatch(qCase);
+t('Q9 默认案号保留', q9.includes(qCase), q9);
+const Hq9 = makeHarness({ redactCaseNumbers: true });
+const q9b = await Hq9.dispatch(qCase);
+t('Q10 开启案号脱敏', q9b.includes('[REDACTED_CASE_') && !q9b.includes(qCase), q9b);
+const qDob = '出生日期：1985年2月12日';
+const q10 = await H.dispatch(qDob);
+t('Q11 默认出生日期保留', q10.includes(qDob), q10);
+const Hq10 = makeHarness({ redactDob: true });
+const q10b = await Hq10.dispatch(qDob);
+t('Q12 开启出生日期脱敏', q10b.includes('[REDACTED_DOB_') && !q10b.includes('1985年2月12日'), q10b);
 
 // R. 占位符编号单调：单类别超过上限（2000）逐出最旧条目，编号绝不复用
 const HM = makeHarness({ logRedactions: false });
@@ -417,6 +440,14 @@ for (let i = 1; i <= 2001; i++) rlast = await HM.dispatch('邮箱 ' + rEmail(i))
 t('R1 超限后编号不复用', rlast.includes('[REDACTED_EMAIL_2001]') && !rlast.includes('[REDACTED_EMAIL_1]'), rlast);
 const rAgain = await HM.dispatch('邮箱 ' + rEmail(1));
 t('R2 旧值重新编号仍唯一', rAgain.includes('[REDACTED_EMAIL_2002]') && !rAgain.includes('[REDACTED_EMAIL_1]'), rAgain);
+
+// S. 交叉规则幂等：公司占位符紧邻街道时，第二轮不得产生新匹配（曾因左边界环视被替换文本改变而破坏幂等）
+const HS = makeHarness({ logRedactions: false });
+const s1 = await HS.dispatch('中国人民银行深圳市分行南山路');
+const s2 = await HS.dispatch(s1);
+t('S1 公司+街道交叉幂等', s1 === s2 && s1.includes('[REDACTED_COMPANY_') && !s1.includes('中国人民银行') && !s1.includes('[REDACTED_STREET_'), s1);
+const s3 = await HS.dispatch('南山路12号');
+t('S2 街道独立识别不受影响', s3.includes('[REDACTED_STREET_') && !s3.includes('南山路12号'), s3);
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exitCode = fail > 0 ? 1 : 0;

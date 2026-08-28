@@ -11,6 +11,10 @@
         dropSessionId: true
         redactCredentials: true
         redactAddress: true
-        redactFacts: false
+        redactNames: true
+        redactCompanies: true
+        redactOrgs: true
+        redactCaseNumbers: false
+        redactDob: false
         failClosed: true
         strictUnknown: true

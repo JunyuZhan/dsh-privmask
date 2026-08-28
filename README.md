@@ -25,9 +25,9 @@ DeepSeek Harness 本地脱敏插件：在请求发往云端大模型之前，将
 - **出站脱敏**：PEM/JWT/API Key、Bearer/Authorization、邮箱、电话、IPv4/IPv6、身份证（18/15 位）、统一社会信用代码、手机/座机、银行卡（Luhn 校验）、案号、车牌、护照/证件、出生日期、地址、公司名、司法机关
 - **入站还原**：模型输出文本与工具调用参数中的占位符在本地还原为原值；还原值再次出站时重新脱敏，云端始终只看到占位符
 - **严格模式**：脱敏异常（failClosed）、未检查字段（strictUnknown）默认拒绝请求；非文本内容默认剥离（nonTextPolicy=strip），图片字节不出本地
-- **律师模式（默认）**：凭据与地址脱敏，案件事实（姓名/案号/出生日期/公司/机关）默认保留，保证模型可做金额核算、管辖判断等精确工作；涉案金额不脱敏
+- **隐私优先（默认）**：姓名、身份证、联系方式、地址、公司/单位名称等能唯一锁定对象的信息默认脱敏；案号、出生日期、涉案金额等公开可查或办案所需信息默认保留
 - **会话一致性**：同一会话内同一值跨请求映射到同一占位符，模型可跨轮关联实体；不同会话相互隔离
-- **类别化配置**：凭据 / 地址 / 事实类 分别开关，按场景组合
+- **类别化配置**：凭据 / 地址 / 姓名 / 公司 / 机关 / 案号 / 出生日期 分别开关，按场景组合
 
 ## 安装
 
@@ -54,7 +54,7 @@ npm install dsh-privmask
 
 ## 快速开始
 
-默认配置即「律师模式」：密钥凭据与地址脱敏，案件事实保留。
+默认配置即「隐私优先」：密钥凭据、地址、姓名、公司/单位名称与 PII 脱敏；案号、出生日期、涉案金额保留（公开可查或办案所需）。
 
 ```yaml
 # $DSH_HOME/profiles/web/cordis.patch.yml 中按 id 覆盖
@@ -63,12 +63,16 @@ npm install dsh-privmask
     enabled: true
     redactCredentials: true
     redactAddress: true
-    redactFacts: false
+    redactNames: true
+    redactCompanies: true
+    redactOrgs: true
+    redactCaseNumbers: false
+    redactDob: false
     nonTextPolicy: strip
     failClosed: true
 ```
 
-需要全面脱敏时，将 `redactFacts: true`；需要严格身份证校验时保持 `strictId18: true`（默认）。
+需要案号/出生日期也脱敏时，将 `redactCaseNumbers: true` / `redactDob: true`；需要严格身份证校验时保持 `strictId18: true`（默认）。
 
 ## 配置
 
@@ -78,7 +82,11 @@ npm install dsh-privmask
 | `cnEntities` | `true` | 中文实体识别总开关 |
 | `redactCredentials` | `true` | 凭据类脱敏：PEM、JWT、API Key、Bearer/Authorization、密码等 |
 | `redactAddress` | `true` | 地址类脱敏：省市区乡、住址、户籍地、送达地址等 |
-| `redactFacts` | `false` | 事实类脱敏：姓名、案号、出生日期、公司、司法机关（律师模式默认保留） |
+| `redactNames` | `true` | 姓名脱敏：姓名是能唯一锁定当事人的信息 |
+| `redactCompanies` | `true` | 公司名称脱敏：法人唯一标识 |
+| `redactOrgs` | `true` | 机关/单位名称脱敏 |
+| `redactCaseNumbers` | `false` | 案号脱敏：默认保留（公开案件标识，管辖/关联判断需要真值） |
+| `redactDob` | `false` | 出生日期脱敏：默认保留（非唯一信息，年龄/时效计算需要真值） |
 | `strictId18` | `true` | 身份证 18 位严格校验：仅校验位合法的号码脱敏；关闭后日期段合理或带「身份证号」上下文的号码也脱敏 |
 | `restoreInbound` | `true` | 入站还原：云端返回的占位符在本地还原为原值（响应显示、工具执行），下次出站重新脱敏 |
 | `nonTextPolicy` | `strip` | 非文本内容策略：`strip`=移除后放行、`block`=拒绝请求、`allow`=原样透传 |
@@ -110,7 +118,10 @@ npm install dsh-privmask
 |---|---|---|
 | 密钥凭据 | 脱敏 | 模型永远不需要，脱敏零损失 |
 | 地址（省市区乡/住址） | 脱敏 | 当事人隐私核心；起草文书时由入站还原写回真值 |
-| 案件事实（姓名/案号/日期/公司） | 保留 | 模型需基于真值做金额核算、管辖判断等精确工作 |
+| 姓名 | 脱敏 | 能唯一锁定当事人的信息 |
+| 公司/单位名称 | 脱敏 | 法人/单位唯一标识 |
+| 案号 | 保留 | 公开案件标识，不指向个人；管辖/关联判断需要真值 |
+| 出生日期 | 保留 | 非唯一信息；年龄/时效计算需要真值 |
 | 涉案金额 | 保留 | 诉讼费、违约金、利息计算依赖金额 |
 | 邮箱/电话/身份证等 PII | 脱敏 | 高敏感身份信息 |
 
@@ -128,7 +139,7 @@ npm install dsh-privmask
 
 ```sh
 node test/self-test.js        # 14 项功能回归（端到端拦截 + 中文实体）
-node test/reliability-test.js # 77 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/严格模式/入站还原/类别策略/性能/编号单调）
+node test/reliability-test.js # 88 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/严格模式/入站还原/类别策略/性能/编号单调/交叉规则）
 node test/fuzz-test.js        # 300 例随机文本 × 2 断言（不崩 + 幂等，共 600 断言）
 ```
 

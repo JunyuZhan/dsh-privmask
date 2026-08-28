@@ -56,8 +56,8 @@ const ctx = {
   },
 };
 
-// 全规则回归：开启事实类（姓名/公司/机关）——默认配置下事实类为保留
-apply(ctx, { redactFacts: true });
+// 全规则回归：默认隐私配置（姓名/公司/机关/地址/凭据/PII 均脱敏）
+apply(ctx, {});
 
 const options = {
   provider: 'test',

@@ -17,7 +17,11 @@ export interface Config {
   restoreInbound?: boolean;
   redactCredentials?: boolean;
   redactAddress?: boolean;
-  redactFacts?: boolean;
+  redactNames?: boolean;
+  redactCompanies?: boolean;
+  redactOrgs?: boolean;
+  redactCaseNumbers?: boolean;
+  redactDob?: boolean;
   failClosed?: boolean;
   strictUnknown?: boolean;
   logRedactions?: boolean;
