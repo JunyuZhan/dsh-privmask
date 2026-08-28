@@ -108,7 +108,7 @@ npm install dsh-privmask
 - **reasoning 内容会上云**：adapter 将 `reasoning` 块序列化为 `reasoning_content` 发送，本插件同样脱敏。
 - **辅助调用同样脱敏**：`purpose: compaction / session-title` 的请求同样经过 `llm/stream`。
 - **原请求保持不变**：agent-loop 构建的请求被深冻结并用 WeakSet 标记；本插件生成脱敏副本重入水瀑，原请求对象不修改；用户输入在落盘前已由 `agent/pre-step` 遮罩。
-- **日志落盘前遮罩**：`agent/pre-step` 改写进入步骤的用户消息，`tools/post-execute` 改写工具结果——两者在写入 `user/message` / `tool/result` 事件前即替换为占位符；与 `llm/stream` 共用同一会话映射，编号一致，且 `llm/stream` 仍作为辅助调用（compaction/session-title）的兜底。
+- **日志落盘前遮罩**：`agent/pre-step` 改写进入步骤的用户消息，`tools/post-execute` 改写工具结果，`tools/ptc-dispatch-log`（dsh ≥ 0.1.2）改写 run_code 子派发日志——在写入 `user/message` / `tool/result` / `tool/code-dispatch` 事件前即替换为占位符；与 `llm/stream` 共用同一会话映射，编号一致，且 `llm/stream` 仍作为辅助调用（compaction/session-title）的兜底。
 - **入站还原**：模型返回流中的占位符按会话映射在本地还原为原值；还原内容再次出站时重新脱敏。
 - **会话头**：adapter 会发送 `x-deepseek-harness-session-id` 请求头，`dropSessionId` 默认移除。
 
@@ -143,7 +143,7 @@ npm install dsh-privmask
 
 ```sh
 node test/self-test.js        # 14 项功能回归（端到端拦截 + 中文实体）
-node test/reliability-test.js # 96 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩）
+node test/reliability-test.js # 99 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩）
 node test/fuzz-test.js        # 300 例随机文本 × 2 断言（不崩 + 幂等，共 600 断言）
 ```
 

@@ -451,12 +451,13 @@ t('S2 街道独立识别不受影响', s3.includes('[REDACTED_STREET_') && !s3.i
 
 // T. 日志脱敏（方案2）：agent/pre-step 用户消息 + tools/post-execute 工具结果在落盘前遮罩
 function logMaskHarness(config) {
-  let preStep = null, postExec = null, llmFn = null, received = null;
+  let preStep = null, postExec = null, ptcLog = null, llmFn = null, received = null;
   const llmStub = { stream(o) { received = o; return (async function* () { yield { type: 'finish', reason: { kind: 'stop' } }; })(); } };
   const ctx = {
     on(name, fn) {
       if (name === 'agent/pre-step') preStep = fn;
       else if (name === 'tools/post-execute') postExec = fn;
+      else if (name === 'tools/ptc-dispatch-log') ptcLog = fn;
       else if (name === 'llm/stream') llmFn = fn;
       return () => {};
     },
@@ -469,6 +470,9 @@ function logMaskHarness(config) {
     },
     async postExecute(sessionId, name, content) {
       return postExec({ name, agent: { session: { id: sessionId } } }, {}, async () => ({ kind: 'accept', content }));
+    },
+    async ptcDispatch(sessionId, name, content) {
+      return ptcLog({ name, agent: { session: { id: sessionId } }, exec: { agent: { session: { id: sessionId } } }, content }, async () => content);
     },
     async llm(text, sessionId, extra = {}) {
       received = null;
@@ -505,6 +509,14 @@ const td8 = await LT2.llm(masked, 'sess-T2', { system: '联系 ' + S.email });
 t('T7 跨钩子同值同号', td8.system.includes('[REDACTED_EMAIL_1]') && td8.messages[0].content[0].text.includes('[REDACTED_EMAIL_1]') && !td8.system.includes(S.email), JSON.stringify(td8.system));
 const td9 = await LT2.llm('绕过 pre-step 的调用 ' + S.email, 'sess-T2');
 t('T8 llm/stream 兜底仍脱敏', td9.messages[0].content[0].text.includes('[REDACTED_EMAIL_') && !td9.messages[0].content[0].text.includes(S.email), td9.messages[0].content[0].text);
+const td10 = await LT.ptcDispatch('sess-T', 'run_code', [{ type: 'text', text: '子派发结果 ' + S.email }]);
+t('T9 ptc-dispatch-log 子派发落盘遮罩', td10[0].text.includes('[REDACTED_EMAIL_') && !td10[0].text.includes(S.email), JSON.stringify(td10));
+const LTptc = logMaskHarness({ logRedactions: false });
+const td11 = await LTptc.ptcDispatch('sess-T', 'run_code', [{ type: 'text', text: '结果' }, { type: 'image', image: 'aGVsbG8=' }]);
+t('T10 ptc-dispatch-log strip-图片移除', td11.length === 1 && td11[0].type === 'text', JSON.stringify(td11));
+const LTptcB = logMaskHarness({ logRedactions: false, nonTextPolicy: 'block' });
+const td12 = await LTptcB.ptcDispatch('sess-T', 'run_code', [{ type: 'image', image: 'aGVsbG8=' }]);
+t('T11 ptc-dispatch-log block-安全标记替换', td12.length === 1 && td12[0].text.includes('已拦截') && !td12[0].text.includes('aGVsbG8='), JSON.stringify(td12));
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exitCode = fail > 0 ? 1 : 0;
