@@ -88,6 +88,16 @@ t('D1 伪造身份证18', (await H.dispatch(S.sfz + S.idFake)).includes(S.idFake
 t('D2 17位数字', (await H.dispatch('编号 ' + S.id17)) === '编号 ' + S.id17);
 t('D3 20位数字', (await H.dispatch('编号 ' + S.id20)) === '编号 ' + S.id20);
 t('D4 15位无上下文', (await H.dispatch('编号 ' + S.id15)) === '编号 ' + S.id15);
+// 严格模式（默认）：校验位错误 → 放行（避免误伤订单号等）
+// 宽松模式（strictId18=false）：校验位错误但日期段合理、或带「身份证号」上下文 → 脱敏
+const idShaped = '522424198502122536'; // 校验位错误（应为 8，实际 6），日期段 19850212 合法
+const Hr = makeHarness({ strictId18: false });
+const d5 = await Hr.dispatch('号码 ' + idShaped);
+t('D5 宽松-校验位错但日期合理仍脱敏', d5.includes('[REDACTED_ID18_') && !d5.includes(idShaped), d5);
+const d6 = await Hr.dispatch('身份证号 ' + idShaped);
+t('D6 宽松-上下文明确-校验位错仍脱敏', d6.includes('[REDACTED_ID18_') && !d6.includes(idShaped), d6);
+const d7 = await Hr.dispatch('号码 12345678901234567X'); // 日期段 78901234 不合法
+t('D7 宽松-非身份证形态不脱敏', d7.includes('12345678901234567X'), d7);
 
 // E. 同值映射
 const same = await H.dispatch(S.email + ' 与 ' + S.email + ' 相同，还有 ' + S.email);

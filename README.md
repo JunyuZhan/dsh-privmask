@@ -69,6 +69,7 @@ dsh plugin --profile web remove dsh-privmask
 | `longTokens` | `true` | 长 hex/base64 串脱敏 |
 | `dropSessionId` | `true` | 移除会话关联头 |
 | `failClosed` | `true` | 严格模式：脱敏异常时拒绝请求，绝不把未脱敏数据发往云端 |
+| `strictId18` | `true` | 身份证 18 位严格校验：仅校验位合法的号码脱敏（避免误伤订单号）；关闭后日期段合理或带「身份证号」上下文的号码也脱敏 |
 | `strictUnknown` | `true` | 严格模式：发现未检查的未知字段时拒绝请求（确认字段无敏感数据可关） |
 | `logRedactions` | `true` | 每次脱敏打印一行统计日志 |
 

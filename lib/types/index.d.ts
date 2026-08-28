@@ -13,6 +13,7 @@ export interface Config {
   longTokens?: boolean;
   dropSessionId?: boolean;
   cnEntities?: boolean;
+  strictId18?: boolean;
   failClosed?: boolean;
   strictUnknown?: boolean;
   logRedactions?: boolean;
