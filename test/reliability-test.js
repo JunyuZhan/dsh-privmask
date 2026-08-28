@@ -156,6 +156,13 @@ const rn4 = await Hf.dispatch('法定代表人是' + sfName);
 t('I7 系动词衔接', rn4.includes('[REDACTED_NAME_') && !rn4.includes(sfName), rn4);
 const rn5 = await Hf.dispatch('委托人：' + S.name2);
 t('I8 委托人角色词', rn5.includes('[REDACTED_NAME_') && !rn5.includes(S.name2), rn5);
+// 常见姓缺失（詹）与 2 字名+动词边界（离婚/诉）回归
+const zhanYongfei = cn(0x8a79, 0x6c38, 0x98de); // 詹永飞
+const liLi = cn(0x674e, 0x4e3d); // 李丽
+const rn6 = await Hf.dispatch('原告' + zhanYongfei + '与被告' + liLi + '离婚纠纷一案');
+t('I9 詹姓识别+离婚边界', rn6.includes('[REDACTED_NAME_') && !rn6.includes(zhanYongfei) && !rn6.includes(liLi), rn6);
+const rn7 = await Hf.dispatch('原告' + zhanYongfei + '诉被告' + liLi + '离婚');
+t('I10 诉/离婚边界', rn7.includes('[REDACTED_NAME_') && !rn7.includes(zhanYongfei) && !rn7.includes(liLi), rn7);
 
 // J. 工具元信息脱敏配置
 const coName = cn(0x6df1, 0x5733, 0x5e02, 0x5357, 0x5c71, 0x79d1, 0x6280, 0x6709, 0x9650, 0x516c, 0x53f8); // 深圳市南山科技有限公司
