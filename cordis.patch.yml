@@ -1,0 +1,13 @@
+# dsh-privmask bundle patch：把脱敏插件挂载进 profile 层栈。
+# 由 package.json 的 dsh.bundle.patch 声明；用户可在自己的 profile
+# cordis.patch.yml 中按 id 覆盖 config（整行替换）。
+- insert:
+    - id: privmask
+      name: dsh-privmask
+      config:
+        enabled: true
+        redactPaths: false
+        nonTextPolicy: strip
+        dropSessionId: true
+        failClosed: true
+        strictUnknown: true

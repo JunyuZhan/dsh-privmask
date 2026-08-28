@@ -24,6 +24,15 @@ DeepSeek Harness **本地脱敏插件**（Host-only 静态版）：在 `llm/stre
 dsh plugin --profile web add dsh-privmask
 ```
 
+包通过 `dsh.bundle` 声明自动挂载到 profile 层栈（无需手动编辑
+`cordis.patch.yml`）；安装后重启 `dsh web` 生效。
+
+已有旧版本需要升级激活 bundle 时：
+
+```sh
+dsh plugin --profile web update dsh-privmask
+```
+
 或作为依赖直接安装：
 
 ```sh
@@ -44,22 +53,8 @@ dsh plugin --profile web remove dsh-privmask
 
 卸载后重启 Web 服务生效；若你曾在 `cordis.patch.yml` 中手动挂载过本插件，请同时删除对应行。
 
-### 挂载
-
-编辑 `$DSH_HOME/profiles/web/cordis.patch.yml`：
-
-```yaml
-- id: privmask
-  name: dsh-privmask
-  config:
-    enabled: true
-    cnEntities: true
-    redactPaths: false   # 开启会替换绝对路径，但会破坏文件类工具，默认关
-    dropSessionId: true
-    failClosed: true     # 严格模式：脱敏异常时拒绝请求，保证敏感数据不出本地
-```
-
-重启 `dsh web` 生效。
+如需调整配置，在 `$DSH_HOME/profiles/web/cordis.patch.yml` 中按 `id: privmask`
+覆盖对应行（整行 config 替换）。
 
 ## 配置项
 
