@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![CI](https://github.com/JunyuZhan/dsh-privmask/actions/workflows/test.yml/badge.svg)](https://github.com/JunyuZhan/dsh-privmask/actions/workflows/test.yml)
 
-DeepSeek Harness 本地脱敏插件：在请求发往云端大模型之前，将密钥、个人身份信息与中文实体替换为 `[REDACTED_类别_N]` 占位符；云端只看到脱敏内容，本地会话日志与工具执行保留原文。支持入站还原，模型返回的占位符在本地还原为原值，保证工具链与文档起草的精度。
+DeepSeek Harness 本地脱敏插件：在请求发往云端大模型之前，将密钥、个人身份信息与中文实体替换为 `[REDACTED_类别_N]` 占位符；云端只看到脱敏内容，用户输入与工具结果在写入本地会话日志前同样遮罩。支持入站还原，模型返回的占位符在本地还原为原值，保证工具链与文档起草的精度。
 
 ## 目录
 
@@ -24,6 +24,7 @@ DeepSeek Harness 本地脱敏插件：在请求发往云端大模型之前，将
 
 - **出站脱敏**：PEM/JWT/API Key、Bearer/Authorization、邮箱、电话、IPv4/IPv6、身份证（18/15 位）、统一社会信用代码、手机/座机、银行卡（Luhn 校验）、案号、车牌、护照/证件、出生日期、地址、公司名、司法机关
 - **入站还原**：模型输出文本与工具调用参数中的占位符在本地还原为原值；还原值再次出站时重新脱敏，云端始终只看到占位符
+- **日志脱敏**：用户输入（`agent/pre-step`）与工具结果（`tools/post-execute`）在写入会话日志前遮罩，日志不落明文；模型回复仍由入站还原为真值
 - **严格模式**：脱敏异常（failClosed）、未检查字段（strictUnknown）默认拒绝请求；非文本内容默认剥离（nonTextPolicy=strip），图片字节不出本地
 - **隐私优先（默认）**：姓名、身份证、联系方式、地址、公司/单位名称等能唯一锁定对象的信息默认脱敏；案号、出生日期、涉案金额等公开可查或办案所需信息默认保留
 - **会话一致性**：同一会话内同一值跨请求映射到同一占位符，模型可跨轮关联实体；不同会话相互隔离
@@ -106,7 +107,8 @@ npm install dsh-privmask
 - **只处理会真正上云的内容**：adapter 序列化时只发送 `message.content` 内容块；消息的 `source` 元数据（notice 摘要、snapshot 片段、replayState）不会上云，因此不在此列。
 - **reasoning 内容会上云**：adapter 将 `reasoning` 块序列化为 `reasoning_content` 发送，本插件同样脱敏。
 - **辅助调用同样脱敏**：`purpose: compaction / session-title` 的请求同样经过 `llm/stream`。
-- **原请求保持不变**：agent-loop 构建的请求被深冻结并用 WeakSet 标记；本插件生成脱敏副本重入水瀑，原请求对象不修改，本地会话日志保留原文。
+- **原请求保持不变**：agent-loop 构建的请求被深冻结并用 WeakSet 标记；本插件生成脱敏副本重入水瀑，原请求对象不修改；用户输入在落盘前已由 `agent/pre-step` 遮罩。
+- **日志落盘前遮罩**：`agent/pre-step` 改写进入步骤的用户消息，`tools/post-execute` 改写工具结果——两者在写入 `user/message` / `tool/result` 事件前即替换为占位符；与 `llm/stream` 共用同一会话映射，编号一致，且 `llm/stream` 仍作为辅助调用（compaction/session-title）的兜底。
 - **入站还原**：模型返回流中的占位符按会话映射在本地还原为原值；还原内容再次出站时重新脱敏。
 - **会话头**：adapter 会发送 `x-deepseek-harness-session-id` 请求头，`dropSessionId` 默认移除。
 
@@ -125,7 +127,7 @@ npm install dsh-privmask
 | 涉案金额 | 保留 | 诉讼费、违约金、利息计算依赖金额 |
 | 邮箱/电话/身份证等 PII | 脱敏 | 高敏感身份信息 |
 
-出站边界：云端不可逆地只能看到占位符。入站还原仅发生在本地内存与会话日志，还原值一旦再次出站即被重新脱敏。
+出站边界：云端不可逆地只能看到占位符。日志边界：用户输入与工具结果落盘前已遮罩为占位符；模型回复（含工具调用参数）经入站还原以真值落盘——这是方案取舍（保证工具执行与界面显示真值）。入站还原仅发生在本地内存与会话日志，还原值一旦再次出站即被重新脱敏。
 
 ## 已知限制
 
@@ -133,13 +135,15 @@ npm install dsh-privmask
 - **启发式识别**：姓名/公司/地址等基于角色上下文、姓氏库与正则规则，复杂句式下可能漏检或误伤。
 - **身份证严格校验**：默认仅校验位合法的 18 位号码被脱敏；校验位错误的号码会被放行（避免误伤订单号），若来源数据可能被抄错/OCR 错位，可关闭 `strictId18`。
 - **文件名与路径默认保留**（`redactPaths: false`），开启后文件类工具链会断裂。
+- **日志中模型回复为真值**：方案取舍下 assistant 消息（模型回显的姓名/公司等）与工具调用参数在日志中为真值；如需日志完全无明文，需关闭入站还原或使用更严格的落盘方案。
+- **`nonTextPolicy: block` 时用户消息会被整体拒绝**：图片/文件块在 `agent/pre-step` 即触发步骤拒绝（`reject`），不写入日志也不上云。
 - **内存映射**：占位符映射仅存于内存，进程重启后会话内映射即失效；单类别超过 2000 个不同值后最旧映射被逐出（编号不复用），被逐出的旧占位符不再还原；云端侧不可逆，无法还原。
 
 ## 测试与 CI
 
 ```sh
 node test/self-test.js        # 14 项功能回归（端到端拦截 + 中文实体）
-node test/reliability-test.js # 88 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/严格模式/入站还原/类别策略/性能/编号单调/交叉规则）
+node test/reliability-test.js # 96 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩）
 node test/fuzz-test.js        # 300 例随机文本 × 2 断言（不崩 + 幂等，共 600 断言）
 ```
 

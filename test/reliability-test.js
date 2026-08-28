@@ -449,5 +449,62 @@ t('S1 公司+街道交叉幂等', s1 === s2 && s1.includes('[REDACTED_COMPANY_')
 const s3 = await HS.dispatch('南山路12号');
 t('S2 街道独立识别不受影响', s3.includes('[REDACTED_STREET_') && !s3.includes('南山路12号'), s3);
 
+// T. 日志脱敏（方案2）：agent/pre-step 用户消息 + tools/post-execute 工具结果在落盘前遮罩
+function logMaskHarness(config) {
+  let preStep = null, postExec = null, llmFn = null, received = null;
+  const llmStub = { stream(o) { received = o; return (async function* () { yield { type: 'finish', reason: { kind: 'stop' } }; })(); } };
+  const ctx = {
+    on(name, fn) {
+      if (name === 'agent/pre-step') preStep = fn;
+      else if (name === 'tools/post-execute') postExec = fn;
+      else if (name === 'llm/stream') llmFn = fn;
+      return () => {};
+    },
+    get(n) { return n === 'llm' ? llmStub : undefined; },
+  };
+  apply(ctx, config);
+  return {
+    async preStep(sessionId, messages) {
+      return preStep({ agent: { session: { id: sessionId } }, messages: [] }, async () => ({ kind: 'enter', messages }));
+    },
+    async postExecute(sessionId, name, content) {
+      return postExec({ name, agent: { session: { id: sessionId } } }, {}, async () => ({ kind: 'accept', content }));
+    },
+    async llm(text, sessionId, extra = {}) {
+      received = null;
+      const opts = { provider: 't', model: 'm', sessionId, messages: [{ role: 'user', content: [{ type: 'text', text }] }], ...extra };
+      const gen = llmFn(opts, () => { received = opts; return (async function* () { yield { type: 'finish', reason: { kind: 'stop' } }; })(); });
+      for await (const _ of gen) {}
+      return received;
+    },
+  };
+}
+const LT = logMaskHarness({ logRedactions: false });
+const tMsg = [{ role: 'user', content: [{ type: 'text', text: '邮箱 ' + S.email + '，电话 ' + S.phone }] }];
+const td1 = await LT.preStep('sess-T', tMsg);
+t('T1 pre-step 用户消息落盘遮罩', td1.kind === 'enter' && td1.messages[0].content[0].text.includes('[REDACTED_EMAIL_') && !td1.messages[0].content[0].text.includes(S.email) && !td1.messages[0].content[0].text.includes(S.phone), td1.messages[0].content[0].text);
+const tNoPii = [{ role: 'user', content: [{ type: 'text', text: '普通文本' }] }];
+const td2 = await LT.preStep('sess-T', tNoPii);
+t('T2 无敏感内容-决策原样返回', td2.messages === tNoPii, 'identity=' + (td2.messages === tNoPii));
+const LTstrip = logMaskHarness({ logRedactions: false });
+const td3 = await LTstrip.preStep('sess-T', [{ role: 'user', content: [{ type: 'text', text: '看图' }, { type: 'image', image: 'aGVsbG8=' }] }]);
+t('T3 strip-图片块不入日志', td3.messages[0].content.length === 1 && td3.messages[0].content[0].type === 'text', JSON.stringify(td3.messages[0].content));
+const LTblock = logMaskHarness({ logRedactions: false, nonTextPolicy: 'block' });
+const td4 = await LTblock.preStep('sess-T', [{ role: 'user', content: [{ type: 'image', image: 'aGVsbG8=' }] }]);
+t('T4 block-拒绝步骤', td4.kind === 'reject', JSON.stringify(td4));
+const td5 = await LT.postExecute('sess-T', 'write_file', [{ type: 'text', text: '写入 ' + S.email }]);
+t('T5 工具结果落盘遮罩', td5.kind === 'accept' && td5.content[0].text.includes('[REDACTED_EMAIL_') && !td5.content[0].text.includes(S.email), JSON.stringify(td5.content));
+const LTstrip2 = logMaskHarness({ logRedactions: false });
+const td6 = await LTstrip2.postExecute('sess-T', 'lookup', [{ type: 'text', text: '结果' }, { type: 'image', image: 'aGVsbG8=' }]);
+t('T6 工具结果 strip-图片移除', td6.content.length === 1 && td6.content[0].type === 'text', JSON.stringify(td6.content));
+// 映射一致性：pre-step 与 llm/stream 共用会话映射，同值同号
+const LT2 = logMaskHarness({ logRedactions: false });
+const td7 = await LT2.preStep('sess-T2', [{ role: 'user', content: [{ type: 'text', text: '邮箱 ' + S.email }] }]);
+const masked = td7.messages[0].content[0].text;
+const td8 = await LT2.llm(masked, 'sess-T2', { system: '联系 ' + S.email });
+t('T7 跨钩子同值同号', td8.system.includes('[REDACTED_EMAIL_1]') && td8.messages[0].content[0].text.includes('[REDACTED_EMAIL_1]') && !td8.system.includes(S.email), JSON.stringify(td8.system));
+const td9 = await LT2.llm('绕过 pre-step 的调用 ' + S.email, 'sess-T2');
+t('T8 llm/stream 兜底仍脱敏', td9.messages[0].content[0].text.includes('[REDACTED_EMAIL_') && !td9.messages[0].content[0].text.includes(S.email), td9.messages[0].content[0].text);
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exitCode = fail > 0 ? 1 : 0;
