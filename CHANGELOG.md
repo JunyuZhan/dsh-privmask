@@ -3,6 +3,16 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.6] - 2026-08-29
+
+### 新增
+
+- 浏览器 half（客户端模块）：在 设置 → 插件 注册「隐私保护」卡片，展示 dsh-privmask 启停状态、脱敏范围说明与更新/重启指引；模块由 dsh 的 modules 系统自动发现（`dsh.client` 声明），无需改 dsh 组合
+
+### 工程化
+
+- 客户端 bundle 使用 dsh 的 tsdown client 预设构建（`window.__ModuleLoader__` 格式），仅依赖预加载的 react externals；源码存于 `client-src/`，产物 `lib/client.js` 随 npm 包发布
+
 ## [0.2.5] - 2026-08-29
 
 ### 修复
