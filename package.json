@@ -60,7 +60,7 @@
     "llm"
   ],
   "scripts": {
-    "prepublishOnly": "node test/self-test.js && node test/reliability-test.js && node test/fuzz-test.js",
+    "prepublishOnly": "node test/self-test.js && node test/accuracy-test.js && node test/reliability-test.js && node test/fuzz-test.js",
     "mask:preview": "node tools/mask-preview.mjs"
   }
 }
