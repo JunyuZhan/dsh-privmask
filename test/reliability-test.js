@@ -689,6 +689,46 @@ await XH.watchCb({ enabled: true, redactNames: true, redactCompanies: true, reda
 const x3 = await XH.dispatch('邮箱 ' + S.email);
 t('X4 live 重新开启-恢复脱敏', x3.includes('[REDACTED_EMAIL_') && !x3.includes(S.email), x3);
 
+// X5: settings 服务晚于插件加载时，惰性重试注册命名空间
+function lazySettingsHarness() {
+  let llmFn = null;
+  let settings = undefined;
+  let registered = null;
+  let watchCb = null;
+  const ctx = {
+    on(n, f) { if (n === 'llm/stream') llmFn = f; return () => {}; },
+    get(n) {
+      if (n === 'llm') return { stream() { return (async function* () {})(); } };
+      if (n === 'settings') return settings;
+      return undefined;
+    },
+    emit() {},
+  };
+  apply(ctx, { logRedactions: false });
+  return {
+    provideSettings() {
+      settings = {
+        register(ns, schema, options) {
+          registered = { ns, options };
+          return { get: () => options.base, watch: (cb) => { watchCb = cb; return () => {}; }, update: async () => {} };
+        },
+      };
+    },
+    async llm() {
+      const opts = { provider: 't', model: 'm', sessionId: 's', messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }] };
+      const gen = llmFn(opts, () => (async function* () { yield { type: 'finish', reason: { kind: 'stop' } }; })());
+      for await (const _ of gen) {}
+    },
+    get registered() { return registered; },
+    get watchCb() { return watchCb; },
+  };
+}
+const XL = lazySettingsHarness();
+t('X5a apply 时 settings 不可用-未注册', XL.registered === null);
+XL.provideSettings();
+await XL.llm(); // 惰性重试
+t('X5b 服务就绪后惰性注册', XL.registered !== null && XL.registered.ns === 'privmask' && XL.registered.options.applies === 'live' && typeof XL.watchCb === 'function', JSON.stringify(XL.registered && XL.registered.ns));
+
 // Y. 入站还原与请求脱敏路径解耦：早退路径（无脱敏内容、保留 sessionId）也必须还原回复
 function restoreEarlyPathHarness(config) {
   let preStep = null, llmFn = null;
