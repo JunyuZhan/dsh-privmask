@@ -79,6 +79,25 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
   }
 
   const field = (key: string): boolean => Boolean(cfg?.[key])
+  const factsOn = field('redactNames') && field('redactCompanies') && field('redactOrgs')
+  const toggleFacts = async () => {
+    if (cfg === null || saving !== null) return
+    const next = !factsOn
+    setSaving('facts')
+    try {
+      const result = await props.update('privmask', { redactNames: next, redactCompanies: next, redactOrgs: next }, revision)
+      if (result.value) {
+        setCfg(result.value.value)
+        setRevision(result.value.revision)
+      } else {
+        setCfg({ ...cfg, redactNames: next, redactCompanies: next, redactOrgs: next })
+      }
+    } catch {
+      /* 写失败保持原值 */
+    } finally {
+      setSaving(null)
+    }
+  }
   const switchRow = (key: string, label: string) => (
     <div style={line} key={key}>
       <span>{label}</span>
@@ -100,9 +119,17 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
       {writable && cfg !== null ? (
         <>
           {switchRow('enabled', '总开关')}
-          {switchRow('redactNames', '姓名')}
-          {switchRow('redactCompanies', '公司名称')}
-          {switchRow('redactOrgs', '机关/单位')}
+          <div style={line}>
+            <span>全面脱敏（姓名/公司/机关）</span>
+            <button
+              type="button"
+              disabled={!writable || saving !== null}
+              style={{ ...toggleBase, opacity: writable ? 1 : 0.5 }}
+              onClick={toggleFacts}
+            >
+              {factsOn ? '开' : '关'}
+            </button>
+          </div>
           {switchRow('redactAddress', '地址')}
           {switchRow('redactCredentials', '密钥凭据')}
         </>
@@ -111,7 +138,7 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
       )}
       <div style={body}>
         发往云端前，姓名、身份证、电话、邮箱、地址、公司/单位名称与密钥凭据会被替换为占位符；
-        案号、出生日期、涉案金额保留。本地会话日志中的用户输入与工具结果同样遮罩。
+        涉案金额、日期、案号保留（便于金额核算与时效判断）。本地会话日志中的用户输入与工具结果同样遮罩。
       </div>
       <div style={body}>更新：dsh plugin --profile web update dsh-privmask，然后重启 dsh web。</div>
     </div>

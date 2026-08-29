@@ -724,6 +724,26 @@ YH.setReply([
 const y1 = await YH.dispatch(ymasked);
 t('Y1 早退路径仍还原回复', y1.includes(S.email) && !y1.includes('REDACTED_EMAIL_'), y1);
 
+// Z. 本地脱敏对照工具：原文 → 脱敏 → 还原 三份对照
+const { execSync } = await import('node:child_process');
+const { writeFileSync, mkdtempSync } = await import('node:fs');
+const { join } = await import('node:path');
+const { tmpdir } = await import('node:os');
+let zOut = '';
+try {
+  const ztmp = mkdtempSync(join(tmpdir(), 'privmask-test-'));
+  const zfile = join(ztmp, 'sample.txt');
+  writeFileSync(zfile, '原告 王小明，电话 13800138000，涉案金额 1200000 元。');
+  zOut = execSync('node tools/mask-preview.mjs ' + zfile, { encoding: 'utf8' });
+} catch (e) {
+  zOut = '';
+}
+t('Z1 对照工具输出三份', zOut.includes('=== 1. 原文 ===') && zOut.includes('=== 2. 脱敏后') && zOut.includes('=== 3. 还原后'), zOut.slice(0, 40));
+const zMasked = (zOut.match(/=== 2\. 脱敏后[\s\S]*?===\s*\n([\s\S]*?)\n=== 3\./) || [])[1] || '';
+const zRestored = (zOut.match(/=== 3\. 还原后[\s\S]*?===\s*\n([\s\S]*?)\n\n占位符/) || [])[1] || '';
+t('Z2 脱敏后含占位符、金额保留', zMasked.includes('[REDACTED_NAME_1]') && zMasked.includes('1200000') && !zMasked.includes('王小明'), zMasked.slice(0, 80));
+t('Z3 还原后恢复原文', zRestored.includes('原告 王小明') && !zRestored.includes('[REDACTED_NAME_'), zRestored.slice(0, 80));
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exitCode = fail > 0 ? 1 : 0;
 
