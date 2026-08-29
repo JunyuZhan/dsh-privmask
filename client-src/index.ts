@@ -54,7 +54,7 @@ export function apply(ctx: ClientContext): void {
       }
       settings: {
         describe(): Promise<{ ok: boolean; value: unknown; error?: { message: string } }>
-        update(ns: string, patch: Record<string, unknown>, rev?: number): Promise<{ ok: boolean; value?: unknown; error?: { message: string } }>
+        mutate(ns: string, ops: Array<{ op: 'set'; path: string[]; value: unknown }>, rev?: number): Promise<{ ok: boolean; value?: unknown; error?: { message: string } }>
       }
     }
   }).remote
@@ -76,7 +76,8 @@ export function apply(ctx: ClientContext): void {
   }
 
   const update: PrivmaskCardInjected['update'] = async (ns, patch, rev) => {
-    const result = await remote.settings.update(ns, patch, rev)
+    const ops = Object.entries(patch).map(([path, value]) => ({ op: 'set' as const, path: [path], value }))
+    const result = await remote.settings.mutate(ns, ops, rev)
     if (!result.ok) {
       throw new Error(`settings.update failed: ${String(result.error?.message ?? 'unknown')}`)
     }

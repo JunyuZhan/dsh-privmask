@@ -1,4 +1,4 @@
-/** 隐私保护卡片：启停状态 + 常用脱敏类别开关（dsh-settings 命名空间 live 生效）。 */
+/** 隐私保护卡片：状态 + 常用脱敏类别开关（dsh-settings 命名空间 live 生效）。 */
 
 import { useEffect, useState } from 'react'
 
@@ -10,6 +10,7 @@ export interface PrivmaskCardInjected {
     writable: boolean
     namespaces: Array<{ ns: string; value: Record<string, unknown>; revision: number }>
   }>
+  /** 按字段写回（内部转成官方 mutate 操作），返回写入后的解析值 */
   update: (ns: string, patch: Record<string, unknown>, rev?: number) => Promise<{
     value?: { value: Record<string, unknown>; revision: number }
   }>
@@ -19,15 +20,17 @@ const row: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap
 const title: React.CSSProperties = { fontSize: 15, fontWeight: 600 }
 const body: React.CSSProperties = { fontSize: 13, color: 'var(--dsh-text-2, #888)' }
 const line: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }
-const toggleBase: React.CSSProperties = {
+const btnBase: React.CSSProperties = {
   border: '1px solid var(--dsh-border, #555)',
-  borderRadius: 999,
-  padding: '3px 12px',
-  fontSize: 12,
+  borderRadius: 6,
+  padding: '4px 14px',
+  fontSize: 13,
   cursor: 'pointer',
   background: 'transparent',
   color: 'inherit',
+  minWidth: 64,
 }
+const errorStyle: React.CSSProperties = { fontSize: 12, color: '#e5484d' }
 
 export function PrivmaskCard(props: PrivmaskCardInjected) {
   const [enabled, setEnabled] = useState<boolean | null>(null)
@@ -35,6 +38,7 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
   const [revision, setRevision] = useState<number | undefined>(undefined)
   const [writable, setWritable] = useState(false)
   const [saving, setSaving] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -53,15 +57,18 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
         if (ns) {
           setCfg(ns.value)
           setRevision(ns.revision)
+          setError(null)
         }
       })
-      .catch(() => { if (alive) { setWritable(false); setCfg(null) } })
+      .catch((e) => { if (alive) { setWritable(false); setCfg(null); setError(String(e && e.message ? e.message : e)) } })
     return () => { alive = false }
   }, [props])
 
+  /** 点击动作：把字段翻转为相反值；成功后用服务端返回的解析值刷新显示 */
   const toggle = async (field: string) => {
     if (cfg === null || saving !== null) return
     setSaving(field)
+    setError(null)
     try {
       const next = !Boolean(cfg[field])
       const result = await props.update('privmask', { [field]: next }, revision)
@@ -69,10 +76,10 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
         setCfg(result.value.value)
         setRevision(result.value.revision)
       } else {
-        setCfg({ ...cfg, [field]: next })
+        setError('设置已保存但返回异常，请刷新后重试')
       }
-    } catch {
-      /* 写失败保持原值 */
+    } catch (e) {
+      setError(String(e && e.message ? e.message : e))
     } finally {
       setSaving(null)
     }
@@ -82,35 +89,41 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
   const factsOn = field('redactNames') && field('redactCompanies') && field('redactOrgs')
   const toggleFacts = async () => {
     if (cfg === null || saving !== null) return
-    const next = !factsOn
     setSaving('facts')
+    setError(null)
     try {
+      const next = !factsOn
       const result = await props.update('privmask', { redactNames: next, redactCompanies: next, redactOrgs: next }, revision)
       if (result.value) {
         setCfg(result.value.value)
         setRevision(result.value.revision)
       } else {
-        setCfg({ ...cfg, redactNames: next, redactCompanies: next, redactOrgs: next })
+        setError('设置已保存但返回异常，请刷新后重试')
       }
-    } catch {
-      /* 写失败保持原值 */
+    } catch (e) {
+      setError(String(e && e.message ? e.message : e))
     } finally {
       setSaving(null)
     }
   }
-  const switchRow = (key: string, label: string) => (
-    <div style={line} key={key}>
-      <span>{label}</span>
-      <button
-        type="button"
-        disabled={!writable || saving !== null}
-        style={{ ...toggleBase, opacity: writable ? 1 : 0.5 }}
-        onClick={() => toggle(key)}
-      >
-        {field(key) ? '开' : '关'}
-      </button>
-    </div>
-  )
+
+  /** 一行开关：状态文本（已开启/已关闭）+ 动作按钮（关闭/开启） */
+  const switchRow = (key: string, label: string) => {
+    const on = field(key)
+    return (
+      <div style={line} key={key}>
+        <span>{label}：{on ? '已开启' : '已关闭'}</span>
+        <button
+          type="button"
+          disabled={!writable || saving !== null}
+          style={{ ...btnBase, opacity: writable ? 1 : 0.5 }}
+          onClick={() => toggle(key)}
+        >
+          {on ? '关闭' : '开启'}
+        </button>
+      </div>
+    )
+  }
 
   const label = enabled === true ? '已开启' : enabled === false ? '已关闭' : '状态未知'
   return (
@@ -120,21 +133,22 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
         <>
           {switchRow('enabled', '总开关')}
           <div style={line}>
-            <span>全面脱敏（姓名/公司/机关）</span>
+            <span>全面脱敏（姓名/公司/机关）：{factsOn ? '已开启' : '已关闭'}</span>
             <button
               type="button"
               disabled={!writable || saving !== null}
-              style={{ ...toggleBase, opacity: writable ? 1 : 0.5 }}
+              style={{ ...btnBase, opacity: writable ? 1 : 0.5 }}
               onClick={toggleFacts}
             >
-              {factsOn ? '开' : '关'}
+              {factsOn ? '关闭' : '开启'}
             </button>
           </div>
           {switchRow('redactAddress', '地址')}
           {switchRow('redactCredentials', '密钥凭据')}
+          {error !== null ? <div style={errorStyle}>写入失败：{error}</div> : null}
         </>
       ) : (
-        <div style={body}>运行时开关不可用（settings 未挂载时保持配置文件模式）。</div>
+        <div style={body}>运行时开关不可用（settings 未挂载时保持配置文件模式）。{error ? ' ' + error : ''}</div>
       )}
       <div style={body}>
         发往云端前，姓名、身份证、电话、邮箱、地址、公司/单位名称与密钥凭据会被替换为占位符；
