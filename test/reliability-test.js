@@ -646,6 +646,7 @@ function settingsHarness(config) {
   let listener = null, received = null;
   let registered = null;
   let watchCb = null;
+  let injectCb = null;
   const settings = {
     register(ns, schema, options) {
       registered = { ns, schema, options };
@@ -660,10 +661,12 @@ function settingsHarness(config) {
   const ctx = {
     on(n, f) { if (n === 'llm/stream') listener = f; return () => {}; },
     get(n) { return n === 'llm' ? llmStub : n === 'settings' ? settings : undefined; },
+    inject(deps, cb) { if (Array.isArray(deps) && deps.includes('settings')) injectCb = cb; return () => {}; },
     settings,
     emit() {},
   };
   apply(ctx, config);
+  if (injectCb) injectCb({ settings });
   return {
     get registered() { return registered; },
     get watchCb() { return watchCb; },
@@ -695,6 +698,7 @@ function lazySettingsHarness() {
   let settings = undefined;
   let registered = null;
   let watchCb = null;
+  let injectCb = null;
   const ctx = {
     on(n, f) { if (n === 'llm/stream') llmFn = f; return () => {}; },
     get(n) {
@@ -702,6 +706,7 @@ function lazySettingsHarness() {
       if (n === 'settings') return settings;
       return undefined;
     },
+    inject(deps, cb) { if (Array.isArray(deps) && deps.includes('settings')) injectCb = cb; return () => {}; },
     emit() {},
   };
   apply(ctx, { logRedactions: false });
@@ -713,11 +718,7 @@ function lazySettingsHarness() {
           return { get: () => options.base, watch: (cb) => { watchCb = cb; return () => {}; }, update: async () => {} };
         },
       };
-    },
-    async llm() {
-      const opts = { provider: 't', model: 'm', sessionId: 's', messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }] };
-      const gen = llmFn(opts, () => (async function* () { yield { type: 'finish', reason: { kind: 'stop' } }; })());
-      for await (const _ of gen) {}
+      if (injectCb) injectCb({ settings });
     },
     get registered() { return registered; },
     get watchCb() { return watchCb; },
@@ -726,7 +727,6 @@ function lazySettingsHarness() {
 const XL = lazySettingsHarness();
 t('X5a apply 时 settings 不可用-未注册', XL.registered === null);
 XL.provideSettings();
-await XL.llm(); // 惰性重试
 t('X5b 服务就绪后惰性注册', XL.registered !== null && XL.registered.ns === 'privmask' && XL.registered.options.applies === 'live' && typeof XL.watchCb === 'function', JSON.stringify(XL.registered && XL.registered.ns));
 
 // Y. 入站还原与请求脱敏路径解耦：早退路径（无脱敏内容、保留 sessionId）也必须还原回复

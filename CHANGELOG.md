@@ -3,6 +3,12 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.15] - 2026-08-30
+
+### 修复
+
+- 运行时设置改用官方 `ctx.inject(['settings'])` 软依赖访问（此前用 `ctx.settings.register` 直接访问，服务未注入时不可见，导致卡片开关在真实环境不可用）；服务缺失时优雅降级为配置文件模式
+
 ## [0.2.14] - 2026-08-29
 
 ### 修复
