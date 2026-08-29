@@ -689,6 +689,41 @@ await XH.watchCb({ enabled: true, redactNames: true, redactCompanies: true, reda
 const x3 = await XH.dispatch('邮箱 ' + S.email);
 t('X4 live 重新开启-恢复脱敏', x3.includes('[REDACTED_EMAIL_') && !x3.includes(S.email), x3);
 
+// Y. 入站还原与请求脱敏路径解耦：早退路径（无脱敏内容、保留 sessionId）也必须还原回复
+function restoreEarlyPathHarness(config) {
+  let preStep = null, llmFn = null;
+  let cannedReply = null;
+  const llmStub = { stream() { return (async function* () { for (const c of cannedReply) yield c; })(); } };
+  const ctx = {
+    on(n, f) { if (n === 'agent/pre-step') preStep = f; else if (n === 'llm/stream') llmFn = f; return () => {}; },
+    get(n) { return n === 'llm' ? llmStub : undefined; },
+  };
+  apply(ctx, config);
+  return {
+    async mask(text) {
+      const d = await preStep({ agent: { session: { id: 'sess-Y' } }, messages: [] }, async () => ({ kind: 'enter', messages: [{ role: 'user', content: [{ type: 'text', text }] }] }));
+      return d.messages[0].content[0].text;
+    },
+    async dispatch(maskedText) {
+      const opts = { provider: 't', model: 'm', sessionId: 'sess-Y', messages: [{ role: 'user', content: [{ type: 'text', text: maskedText }] }] };
+      const gen = llmFn(opts, () => (async function* () { for (const c of cannedReply) yield c; })());
+      const out = [];
+      for await (const c of gen) out.push(c);
+      return out.map((c) => c.text || (c.block && c.block.text) || '').join('|');
+    },
+    setReply(r) { cannedReply = r; },
+  };
+}
+const YH = restoreEarlyPathHarness({ logRedactions: false, dropSessionId: false });
+const ymasked = await YH.mask('邮箱 ' + S.email);
+YH.setReply([
+  { type: 'text-delta', index: 0, text: '已记住 [REDACTED_EMAIL_1]' },
+  { type: 'block-end', index: 0, block: { type: 'text', text: '已记住 [REDACTED_EMAIL_1]' } },
+  { type: 'finish', reason: { kind: 'stop' } },
+]);
+const y1 = await YH.dispatch(ymasked);
+t('Y1 早退路径仍还原回复', y1.includes(S.email) && !y1.includes('REDACTED_EMAIL_'), y1);
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exitCode = fail > 0 ? 1 : 0;
 
