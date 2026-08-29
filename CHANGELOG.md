@@ -3,6 +3,12 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.11] - 2026-08-29
+
+### 修复
+
+- 诊断日志写入文件（`<dshHome>/privmask-restore.log`）：启动配置摘要 + 每次请求的还原决策（包装/跳过/映射条数），便于无终端访问时定位
+
 ## [0.2.10] - 2026-08-29
 
 ### 修复
