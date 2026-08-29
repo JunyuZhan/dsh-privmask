@@ -1,6 +1,8 @@
+import test from 'node:test';
 // dsh-privmask 自测：模拟最小 Cordis 上下文，验证拦截器把测试请求脱敏后再交给 adapter。
 // 运行：node test/self-test.js
 import { apply } from '../lib/index.js';
+test('dsh-privmask self-test', async () => {
 
 // 测试数据（码点构造，避免源文件含真实敏感串）
 const cn = (...cps) => String.fromCharCode(...cps);
@@ -112,6 +114,8 @@ async function run() {
   }
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   process.exitCode = fail > 0 ? 1 : 0;
+  if (fail > 0) throw new Error(fail + ' checks failed');
 }
 
 run();
+});

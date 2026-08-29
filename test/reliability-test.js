@@ -1,5 +1,7 @@
+import test from 'node:test';
 // dsh-privmask 可靠性测试（数据全部码点/碎片构造，源码无敏感字面）
 import { apply } from '../lib/index.js';
+test('dsh-privmask reliability', async () => {
 
 const cn = (...cps) => String.fromCharCode(...cps);
 const P = (cat, n) => '[REDACTED_' + cat + '_' + n + ']';
@@ -134,7 +136,11 @@ const big = ('联系 ' + S.email + ' 和 ' + S.phone + ' 密钥 ' + S.sk + '\n')
 const t0 = Date.now();
 await H.dispatch(big);
 const cost = Date.now() - t0;
-t('H1 性能-150KB', cost < 5000, cost + 'ms');
+t('H1 性能-150KB敏感文本', cost < 1000, cost + 'ms');
+const t0b = Date.now();
+await H.dispatch('这是一段没有任何敏感信息的普通法律文书文本，反复出现以填充长度。'.repeat(4000));
+const costPlain = Date.now() - t0b;
+t('H2 性能-纯文本100KB快速路径', costPlain < 500, costPlain + 'ms');
 
 // I. 姓名边界回归（漏检 / 吞字）
 const Hf = makeHarness({}); // 默认隐私配置（姓名/公司/机关脱敏）下测试
@@ -574,5 +580,69 @@ for await (const f of DU.sc.control()) {
 t('U5 展示层还原-control baseline队列', u5ok);
 t('U6 展示层还原-control queue帧', u6ok);
 
+// W. 评审修复回归：Config 校验 / 自定义词表 / 白名单 / delta 跨分片重组
+let w1 = false;
+try { apply({}, { nonTextPolicy: 'x' }); } catch { w1 = true; }
+t('W1 非法配置响亮失败', w1);
+let w2 = false;
+try { apply({}, { enabled: 'false' }); } catch { w2 = true; }
+t('W2 字符串布尔拒绝', w2);
+const HW = makeHarness({ logRedactions: false, customTerms: ['欧阳雪'] });
+const w3 = await HW.dispatch('欧阳雪今天来访');
+t('W3 自定义词表无上下文脱敏', w3.includes('[REDACTED_CUSTOM_') && !w3.includes('欧阳雪'), w3);
+const w4 = await HW.dispatch('欧阳雪儿是另一个名字');
+t('W4 词表精确子串命中长词', w4.includes('[REDACTED_CUSTOM_') && !w4.includes('欧阳雪'), w4);
+const HW2 = makeHarness({ logRedactions: false, preserveValues: ['test@example.com'] });
+const w5 = await HW2.dispatch('联系 test@example.com');
+t('W5 白名单放行', w5.includes('test@example.com') && !w5.includes('REDACTED_EMAIL_'), w5);
+const W_SPLIT = [
+  { type: 'text-delta', index: 0, text: '好的，邮箱 [REDACTED_EMA' },
+  { type: 'text-delta', index: 0, text: 'IL_1] 已记住' },
+  { type: 'block-end', index: 0, block: { type: 'text', text: '好的，邮箱 [REDACTED_EMAIL_1] 已记住' } },
+  { type: 'finish', reason: { kind: 'stop' } },
+];
+const HW3 = inboundHarness({}, W_SPLIT);
+const w6 = await HW3.run('邮箱 restore@privmask-test.com');
+const joinedW = w6.out.filter((c) => c.type === 'text-delta').map((c) => c.text).join('');
+t('W6 delta 跨分片重组还原', joinedW.includes('restore@privmask-test.com') && !joinedW.includes('REDACTED_EMA'), joinedW);
+
+// V. 版本/载荷兼容矩阵：钩子对异形 payload 优雅降级 + emit 缝
+function compatHarness(config, extraGet) {
+  let preStep = null, postExec = null, llmFn = null;
+  const emitted = [];
+  const ctx = {
+    on(n, f) {
+      if (n === 'agent/pre-step') preStep = f;
+      else if (n === 'tools/post-execute') postExec = f;
+      else if (n === 'llm/stream') llmFn = f;
+      return () => {};
+    },
+    get(n) {
+      if (n === 'llm') return { stream() { return (async function* () {})(); } };
+      return extraGet ? extraGet(n) : undefined;
+    },
+    emit(n, p) { emitted.push([n, p]); },
+  };
+  apply(ctx, config);
+  return { preStep, postExec, llmFn, emitted };
+}
+const VC = compatHarness({ logRedactions: false });
+const vDecision = { kind: 'accept', value: { ok: 1 } };
+const v1 = await VC.postExec({ name: 't', agent: { session: { id: 's' } } }, {}, async () => vDecision);
+t('V1 value型工具决策原样放行', v1 === vDecision);
+const vReject = { kind: 'reject' };
+const v2 = await VC.preStep({ agent: { session: { id: 's' } }, messages: [] }, async () => vReject);
+t('V2 reject决策原样放行', v2 === vReject);
+const VC2 = compatHarness({ logRedactions: false }, (n) => n === 'sessionController' ? { page: async () => ({}), follow: async function* () {} } : undefined);
+t('V3 旧版 sessionController 无 control 优雅跳过', true);
+// emit 缝：脱敏后发出结构化事件
+const VC3 = compatHarness({ logRedactions: false });
+const v3 = await VC3.llmFn({ provider: 't', model: 'm', sessionId: 's', messages: [{ role: 'user', content: [{ type: 'text', text: '邮箱 ' + S.email }] }] }, () => (async function* () { yield { type: 'finish', reason: { kind: 'stop' } }; })());
+for await (const _ of v3) {}
+t('V4 emit 结构化事件', VC3.emitted.some(([name, p]) => name === 'privmask/stats' && p.kind === 'redacted' && p.fields >= 1), JSON.stringify(VC3.emitted));
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exitCode = fail > 0 ? 1 : 0;
+
+  if (fail > 0) throw new Error(fail + ' checks failed');
+});

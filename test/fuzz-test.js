@@ -1,5 +1,7 @@
+import test from 'node:test';
 // dsh-privmask fuzz 测试：随机文本不崩、输出为字符串、幂等。
 import { apply } from '../lib/index.js';
+test('dsh-privmask fuzz', async () => {
 let listener, received;
 const llmStub = { stream(o) { received = o; return (async function* () { yield { type: 'finish', reason: { kind: 'stop' } }; })(); } };
 const ctx = { on(n, f) { if (n === 'llm/stream') listener = f; return () => {}; }, get(n) { return n === 'llm' ? llmStub : undefined; } };
@@ -32,3 +34,6 @@ for (let i = 0; i < 300; i++) {
 }
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exitCode = fail > 0 ? 1 : 0;
+
+  if (fail > 0) throw new Error(fail + ' checks failed');
+});

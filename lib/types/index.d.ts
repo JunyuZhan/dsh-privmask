@@ -22,6 +22,8 @@ export interface Config {
   redactOrgs?: boolean;
   redactCaseNumbers?: boolean;
   redactDob?: boolean;
+  customTerms?: string[];
+  preserveValues?: string[];
   failClosed?: boolean;
   strictUnknown?: boolean;
   logRedactions?: boolean;
