@@ -3,6 +3,21 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.8] - 2026-08-29
+
+### 新增
+
+- 运行时设置：插件注册 `privmask` settings 命名空间（dsh-settings，`applies: live`），用户在界面开关后无需重启即生效（引擎重建）
+- 隐私保护卡片升级为可交互：总开关 + 姓名/公司/机关/地址/凭据 类别开关，读写 dsh-settings 命名空间并持久化
+
+### 工程化
+
+- 客户端 bundle 构建改为一次性 /tmp 克隆（不修改 dsh 源码树），npm 包仍只携带自包含的构建产物
+
+### 测试
+
+- 可靠性测试 122 项（新增 settings 注册/live 开关 4 项）
+
 ## [0.2.7] - 2026-08-29
 
 ### 修复

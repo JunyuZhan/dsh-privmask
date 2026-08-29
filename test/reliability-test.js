@@ -641,6 +641,54 @@ const v3 = await VC3.llmFn({ provider: 't', model: 'm', sessionId: 's', messages
 for await (const _ of v3) {}
 t('V4 emit 结构化事件', VC3.emitted.some(([name, p]) => name === 'privmask/stats' && p.kind === 'redacted' && p.fields >= 1), JSON.stringify(VC3.emitted));
 
+// X. 运行时设置：dsh-settings 命名空间注册 + live 生效（引擎重建）
+function settingsHarness(config) {
+  let listener = null, received = null;
+  let registered = null;
+  let watchCb = null;
+  const settings = {
+    register(ns, schema, options) {
+      registered = { ns, schema, options };
+      return {
+        get: () => options.base,
+        watch: (cb) => { watchCb = cb; return () => {}; },
+        update: async () => {},
+      };
+    },
+  };
+  const llmStub = { stream(o) { received = o; return (async function* () { yield { type: 'finish', reason: { kind: 'stop' } }; })(); } };
+  const ctx = {
+    on(n, f) { if (n === 'llm/stream') listener = f; return () => {}; },
+    get(n) { return n === 'llm' ? llmStub : n === 'settings' ? settings : undefined; },
+    settings,
+    emit() {},
+  };
+  apply(ctx, config);
+  return {
+    get registered() { return registered; },
+    get watchCb() { return watchCb; },
+    async dispatch(text) {
+      received = null;
+      const opts = { provider: 't', model: 'm', sessionId: 's', messages: [{ role: 'user', content: [{ type: 'text', text }] }] };
+      const gen = listener(opts, () => { received = opts; return (async function* () { yield { type: 'finish', reason: { kind: 'stop' } }; })(); });
+      for await (const _ of gen) {}
+      return received.messages[0].content[0].text;
+    },
+  };
+}
+const XH = settingsHarness({ logRedactions: false });
+t('X1 settings 命名空间注册', XH.registered !== null && XH.registered.ns === 'privmask' && XH.registered.options.applies === 'live' && typeof XH.watchCb === 'function', JSON.stringify(XH.registered && XH.registered.ns));
+const x1 = await XH.dispatch('邮箱 ' + S.email);
+t('X2 初始配置生效-脱敏', x1.includes('[REDACTED_EMAIL_') && !x1.includes(S.email), x1);
+// 模拟用户在界面关掉总开关：watch 触发 → 引擎重建 → 不再脱敏
+await XH.watchCb({ enabled: false, redactNames: true, redactCompanies: true, redactOrgs: true, redactAddress: true, redactCredentials: true, logRedactions: false });
+const x2 = await XH.dispatch('邮箱 ' + S.email);
+t('X3 live 关闭总开关-不再脱敏', x2.includes(S.email) && !x2.includes('REDACTED_EMAIL_'), x2);
+// 再打开
+await XH.watchCb({ enabled: true, redactNames: true, redactCompanies: true, redactOrgs: true, redactAddress: true, redactCredentials: true, logRedactions: false });
+const x3 = await XH.dispatch('邮箱 ' + S.email);
+t('X4 live 重新开启-恢复脱敏', x3.includes('[REDACTED_EMAIL_') && !x3.includes(S.email), x3);
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exitCode = fail > 0 ? 1 : 0;
 

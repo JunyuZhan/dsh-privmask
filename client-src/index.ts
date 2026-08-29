@@ -1,4 +1,4 @@
-/** dsh-privmask 浏览器 half：在 设置→插件 里注册「隐私保护」卡片。 */
+/** dsh-privmask 浏览器 half：在 设置→插件 里注册「隐私保护」卡片（状态 + 运行时开关）。 */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
@@ -32,8 +32,8 @@ const en: Record<string, string> = {
   update: 'Update: dsh plugin --profile web update dsh-privmask, then restart dsh web.',
 }
 
-/** 客户端服务依赖。 */
-export const inject = ['slots', 'locale', 'remote', 'remote.pluginInventory']
+/** 客户端服务依赖（remote.settings 提供命名空间读写）。 */
+export const inject = ['slots', 'locale', 'remote', 'remote.pluginInventory', 'remote.settings']
 
 /** 注册隐私保护卡片到 设置→插件 页签。 */
 export function apply(ctx: ClientContext): void {
@@ -47,12 +47,40 @@ export function apply(ctx: ClientContext): void {
     }
   }
 
+  const remote = (ctx as unknown as {
+    remote: {
+      pluginInventory: {
+        list(): Promise<{ ok: boolean; value: unknown; error?: { message: string } }>
+      }
+      settings: {
+        describe(): Promise<{ ok: boolean; value: unknown; error?: { message: string } }>
+        update(ns: string, patch: Record<string, unknown>, rev?: number): Promise<{ ok: boolean; value?: unknown; error?: { message: string } }>
+      }
+    }
+  }).remote
+
   const list: PrivmaskCardInjected['list'] = async () => {
-    const result = await (ctx as unknown as { remote: { pluginInventory: { list(): Promise<{ ok: boolean; value: unknown; error?: { message: string } }> } } }).remote.pluginInventory.list()
+    const result = await remote.pluginInventory.list()
     if (!result.ok) {
       throw new Error(`pluginInventory.list failed: ${String(result.error?.message ?? 'unknown')}`)
     }
     return result.value as PrivmaskCardInjected['list'] extends () => Promise<infer T> ? T : never
+  }
+
+  const describe: PrivmaskCardInjected['describe'] = async () => {
+    const result = await remote.settings.describe()
+    if (!result.ok) {
+      throw new Error(`settings.describe failed: ${String(result.error?.message ?? 'unknown')}`)
+    }
+    return result.value as PrivmaskCardInjected['describe'] extends () => Promise<infer T> ? T : never
+  }
+
+  const update: PrivmaskCardInjected['update'] = async (ns, patch, rev) => {
+    const result = await remote.settings.update(ns, patch, rev)
+    if (!result.ok) {
+      throw new Error(`settings.update failed: ${String(result.error?.message ?? 'unknown')}`)
+    }
+    return result.value as PrivmaskCardInjected['update'] extends (ns: string, p: Record<string, unknown>, r?: number) => Promise<infer T> ? T : never
   }
 
   ctx.slots.inject('settings.plugins.tab', () => ctx.slots.register({
@@ -61,6 +89,6 @@ export function apply(ctx: ClientContext): void {
     order: 20,
     label: () => t('tab'),
     locale: NS,
-    inject: (): PrivmaskCardInjected => ({ list }),
+    inject: (): PrivmaskCardInjected => ({ list, describe, update }),
   }, PrivmaskCard))
 }
