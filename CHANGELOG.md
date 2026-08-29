@@ -3,6 +3,12 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.5] - 2026-08-29
+
+### 修复
+
+- 展示层还原：sessionController 解析改为多路径探测（属性访问/严格 get/非严格 get/根上下文），并输出命中路径与 llm 控制探针——定位真实运行环境中的服务可见性问题
+
 ## [0.2.4] - 2026-08-28
 
 ### 修复
