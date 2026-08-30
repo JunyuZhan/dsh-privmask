@@ -174,6 +174,9 @@ test('泛化机构/村镇与真实机构并存：误伤与覆盖', async () => {
     ['的妻子', '被告王五的妻子李四。', '[REDACTED_NAME_'],
     ['的父亲', '被告王五的父亲王大明。', '[REDACTED_NAME_'],
     ['的配偶', '被告王五的配偶李四。', '[REDACTED_NAME_'],
+    ['拉丁字号公司', '3M中国有限公司。', '[REDACTED_COMPANY_'],
+    ['IBM中国', 'IBM中国有限公司。', '[REDACTED_COMPANY_'],
+    ['数字字母公司', '与B2B公司签订合同。', '[REDACTED_COMPANY_'],
   ]
   for (const [name, text, ph] of mustMask) {
     const out = await H.dispatch(text)
