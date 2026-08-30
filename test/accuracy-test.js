@@ -222,6 +222,11 @@ test('泛化机构/村镇与真实机构并存：误伤与覆盖', async () => {
     ['知识产权法院', '北京知识产权法院。', '[REDACTED_ORG_'],
     ['金融法院', '上海金融法院。', '[REDACTED_ORG_'],
     ['海事法院', '大连海事法院。', '[REDACTED_ORG_'],
+    ['被处罚人', '被处罚人王五。', '[REDACTED_NAME_'],
+    ['违法行为人', '违法行为人李四。', '[REDACTED_NAME_'],
+    ['犯罪嫌疑人', '犯罪嫌疑人李四。', '[REDACTED_NAME_'],
+    ['嫌疑人', '嫌疑人王五。', '[REDACTED_NAME_'],
+    ['在逃人员', '在逃人员李四。', '[REDACTED_NAME_'],
   ]
   for (const [name, text, ph] of mustMask) {
     const out = await H.dispatch(text)
