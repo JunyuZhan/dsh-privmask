@@ -691,6 +691,10 @@ t('X3 live 关闭总开关-不再脱敏', x2.includes(S.email) && !x2.includes('
 await XH.watchCb({ enabled: true, redactNames: true, redactCompanies: true, redactOrgs: true, redactAddress: true, redactCredentials: true, logRedactions: false });
 const x3 = await XH.dispatch('邮箱 ' + S.email);
 t('X4 live 重新开启-恢复脱敏', x3.includes('[REDACTED_EMAIL_') && !x3.includes(S.email), x3);
+// X6: settings 更新带入 customTerms → 引擎重建 → 新词立即脱敏（词表热更新）
+await XH.watchCb({ enabled: true, redactNames: true, redactCompanies: true, redactOrgs: true, redactAddress: true, redactCredentials: true, customTerms: ['欧阳雪'], logRedactions: false });
+const x6 = await XH.dispatch('欧阳雪今天来访');
+t('X6 词表热更新-新增词立即脱敏', x6.includes('[REDACTED_CUSTOM_') && !x6.includes('欧阳雪'), x6);
 
 // X5: settings 服务晚于插件加载时，惰性重试注册命名空间
 function lazySettingsHarness() {

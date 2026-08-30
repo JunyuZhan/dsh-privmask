@@ -30,6 +30,24 @@ const btnBase: React.CSSProperties = {
   color: 'inherit',
   minWidth: 64,
 }
+const chipBase: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+  border: '1px solid var(--dsh-border, #555)',
+  borderRadius: 999,
+  padding: '2px 10px',
+  fontSize: 12,
+}
+const inputBase: React.CSSProperties = {
+  flex: 1,
+  border: '1px solid var(--dsh-border, #555)',
+  borderRadius: 6,
+  padding: '4px 8px',
+  fontSize: 13,
+  background: 'transparent',
+  color: 'inherit',
+}
 const errorStyle: React.CSSProperties = { fontSize: 12, color: '#e5484d' }
 
 export function PrivmaskCard(props: PrivmaskCardInjected) {
@@ -39,6 +57,8 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
   const [writable, setWritable] = useState(false)
   const [saving, setSaving] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [termInput, setTermInput] = useState('')
+  const [terms, setTerms] = useState<string[]>([])
 
   useEffect(() => {
     let alive = true
@@ -57,6 +77,7 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
         if (ns) {
           setCfg(ns.value)
           setRevision(ns.revision)
+          setTerms(Array.isArray(ns.value.customTerms) ? ns.value.customTerms.map(String) : [])
           setError(null)
         }
       })
@@ -107,6 +128,39 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
     }
   }
 
+  /** 增删自定义敏感词（写入 settings，live 生效） */
+  const saveTerms = async (next: string[]) => {
+    if (cfg === null || saving !== null) return
+    setSaving('terms')
+    setError(null)
+    try {
+      const result = await props.update('privmask', { customTerms: next }, revision)
+      if (result.value) {
+        setCfg(result.value.value)
+        setRevision(result.value.revision)
+        setTerms(Array.isArray(result.value.value.customTerms) ? result.value.value.customTerms.map(String) : [])
+      } else {
+        setError('设置已保存但返回异常，请刷新后重试')
+      }
+    } catch (e) {
+      setError(String(e && e.message ? e.message : e))
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  const addTerm = () => {
+    const t = termInput.trim()
+    if (!t) return
+    if (terms.includes(t)) { setTermInput(''); return }
+    setTermInput('')
+    void saveTerms([...terms, t])
+  }
+
+  const removeTerm = (t: string) => {
+    void saveTerms(terms.filter((x) => x !== t))
+  }
+
   /** 一行开关：状态文本（已开启/已关闭）+ 动作按钮（关闭/开启） */
   const switchRow = (key: string, label: string) => {
     const on = field(key)
@@ -145,6 +199,37 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
           </div>
           {switchRow('redactAddress', '地址')}
           {switchRow('redactCredentials', '密钥凭据')}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span style={{ fontSize: 13 }}>自定义敏感词（当事人姓名/别名/机构简称）：</span>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                style={inputBase}
+                value={termInput}
+                placeholder="输入敏感词，回车或点添加"
+                onChange={(e) => setTermInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') addTerm() }}
+              />
+              <button type="button" disabled={!writable || saving !== null} style={btnBase} onClick={addTerm}>添加</button>
+            </div>
+            {terms.length > 0 ? (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {terms.map((t) => (
+                  <span style={chipBase} key={t}>
+                    {t}
+                    <button
+                      type="button"
+                      disabled={!writable || saving !== null}
+                      style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'inherit', padding: 0, fontSize: 12 }}
+                      onClick={() => removeTerm(t)}
+                      aria-label={'删除 ' + t}
+                    >×</button>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <div style={body}>暂无自定义词。添加后该词在任何位置出现都会被脱敏（含于长词也会命中）。</div>
+            )}
+          </div>
           {error !== null ? <div style={errorStyle}>写入失败：{error}</div> : null}
         </>
       ) : (
