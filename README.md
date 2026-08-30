@@ -152,7 +152,7 @@ npm install dsh-privmask
 
 ```sh
 node test/self-test.js        # 14 项功能回归（端到端拦截 + 中文实体）
-node test/reliability-test.js # 129 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/词表热更新）
+node test/reliability-test.js # 131 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/词表热更新）
 node test/accuracy-test.js    # 23 项准确性（法律文档矩阵/凭据/PII校验/边界/配置/幂等/性能/高频地址与拉丁公司名/泛化机构与村镇/姓名标签边界）
 node test/fuzz-test.js        # 300 例随机文本 × 2 断言（不崩 + 幂等，共 600 断言）
 ```

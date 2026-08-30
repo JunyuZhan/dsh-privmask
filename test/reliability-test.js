@@ -410,6 +410,13 @@ const HI2 = inboundHarness({ restoreInbound: false }, P_canned);
 const pi2 = await HI2.run('邮箱 ' + P_EMAIL);
 const joined2 = pi2.out.map((c) => c.text || (c.block ? (c.block.text || c.block.arguments || '') : '')).join('|');
 t('P3 关闭还原-保留占位符', joined2.includes(P_PH) && !joined2.includes(P_EMAIL), joined2);
+// P4/P5：字符串 content（非块数组）的展示层还原（历史记录/tool-result 兼容路径）
+const { restoreWireData, restoreBlocksForDisplay } = await import('../lib/restore.js');
+const P_entries = [[P_PH, P_EMAIL]];
+const P_wireStr = restoreWireData({ message: { role: 'user', content: '邮箱 ' + P_PH } }, P_entries);
+t('P4 字符串 content 还原', P_wireStr.message.content === '邮箱 ' + P_EMAIL, JSON.stringify(P_wireStr));
+const P_toolStr = restoreBlocksForDisplay([{ type: 'tool-result', toolCallId: 'c1', content: '结果 ' + P_PH }], P_entries);
+t('P5 tool-result 字符串 content 还原', P_toolStr[0].content === '结果 ' + P_EMAIL, JSON.stringify(P_toolStr));
 
 // Q. 类别级脱敏策略（默认：凭据/地址/姓名/公司/机关脱敏；案号/出生日期/金额保留）
 const q1 = await H.dispatch('原告 ' + S.name1 + ' 与 被告 ' + S.name2 + ' 的合同纠纷');
