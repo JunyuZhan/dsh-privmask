@@ -508,6 +508,9 @@ test('PII 校验位：合法脱敏、非法放行', async () => {
   if (!ok.includes('[REDACTED_ID18_')) throw new Error('合法身份证未脱敏: ' + ok)
   const bad = await H.dispatch('号码 12345678901234567X') // 校验位非法
   if (!bad.includes('12345678901234567X')) throw new Error('非法身份证被误脱敏')
+  // 带「身份证号」上下文的号码即使校验位不合法也必须脱敏（作者已明确标注为证件号）
+  const ctxBad = await H.dispatch('身份证号 522421199001011234') // 校验位非法但有上下文
+  if (!ctxBad.includes('[REDACTED_ID18_')) throw new Error('上下文身份证漏脱敏: ' + ctxBad)
 })
 
 test('中国即时通讯/执业标识：上下文识别不误伤', async () => {

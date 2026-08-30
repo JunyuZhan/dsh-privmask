@@ -86,7 +86,8 @@ t('C8 短数字', (await H.dispatch('订单号 ' + S.no1)) === '订单号 ' + S.
 t('C9 URL', (await H.dispatch('visit ' + S.url)) === 'visit ' + S.url);
 
 // D. 校验拒绝
-t('D1 伪造身份证18', (await H.dispatch(S.sfz + S.idFake)).includes(S.idFake));
+t('D1 伪造身份证18-上下文仍脱敏', (await H.dispatch(S.sfz + S.idFake)).includes('[REDACTED_ID18_'));
+t('D1b 伪造身份证18-无上下文严格放行', (await H.dispatch(S.idFake)).includes(S.idFake));
 t('D2 17位数字', (await H.dispatch('编号 ' + S.id17)) === '编号 ' + S.id17);
 t('D3 20位数字', (await H.dispatch('编号 ' + S.id20)) === '编号 ' + S.id20);
 t('D4 15位无上下文', (await H.dispatch('编号 ' + S.id15)) === '编号 ' + S.id15);
