@@ -231,6 +231,14 @@ test('泛化机构/村镇与真实机构并存：误伤与覆盖', async () => {
     ['执行法官', '执行法官李四。', '[REDACTED_NAME_'],
     ['法官助理', '法官助理王五。', '[REDACTED_NAME_'],
     ['代理律师', '代理律师李四。', '[REDACTED_NAME_'],
+    ['买受人', '买受人王五。', '[REDACTED_NAME_'],
+    ['被背书人', '被背书人王五。', '[REDACTED_NAME_'],
+    ['著作权人', '著作权人李四。', '[REDACTED_NAME_'],
+    ['中国律师协会', '中国律师协会。', '[REDACTED_COMPANY_'],
+    ['慈善基金会', '中国扶贫基金会。', '[REDACTED_COMPANY_'],
+    ['商会', '深圳市总商会。', '[REDACTED_COMPANY_'],
+    ['参加协会（泛指）', '参加协会活动。', ''],
+    ['参加中国律师协会', '参加中国律师协会。', '[REDACTED_COMPANY_'],
   ]
   for (const [name, text, ph] of mustMask) {
     const out = await H.dispatch(text)
