@@ -75,10 +75,310 @@ test('误伤防回归', async () => {
     ['时间', 'at 12:30:45'],
     ['订单号', '订单号 10086'],
     ['C++', 'std::vector<int> x'],
+    ['住所证明（无冒号）', '需要提供住所证明文件。'],
+    ['大型购物中心（泛指）', '大型购物中心客流量大。'],
+    ['水果公司（泛指）', '与水果公司协商。'],
+    ['该公司（保留）', '该公司的合同。'],
+    ['去公司（保留）', '去公司上班。'],
+    ['中国的公司（泛指）', '中国的公司很多。'],
+    ['广州的公司（泛指）', '广州的公司很多。'],
+    ['苹果的代理商（泛指）', '苹果的代理商很多。'],
+    ['腾讯的股东（泛指）', '腾讯的股东很多。'],
+    ['今欠（动词，保留）', '今欠是方言表达。'],
+    ['借到（动词，保留）', '借到钱不容易。'],
+    ['收到（动词，保留）', '收到通知。'],
+    ['在学校（泛指）', '小明在学校学习。'],
+    ['所学校（泛指）', '这所学校有百年历史。'],
+    ['在银行（泛指）', '爸爸在银行工作。'],
+    ['那家酒店（泛指）', '那家酒店很豪华。'],
+    ['这家医院（泛指）', '这家医院很出名。'],
+    ['上个月学校（泛指）', '上个月学校放假了。'],
+    ['去工厂（泛指）', '爸爸去工厂上班。'],
+    ['大街小巷（成语）', '大街小巷都在议论这件事。'],
+    ['我们村（泛指）', '我们村口有棵大树。'],
+    ['他在街道（泛指）', '他在街道上散步。'],
+    ['回到村里（泛指）', '他回到村里看望父母。'],
+    ['去镇上（泛指）', '他去镇上赶集。'],
+    ['住在村里（泛指）', '她住在村里。'],
+    ['本村（泛指）', '本村共有200户人家。'],
+    ['隔壁村（泛指）', '隔壁村的医生来了。'],
+    ['全村（泛指）', '全村都参加了大会。'],
+    ['工业园区（泛指）', '去工业园区招商。'],
+    ['街道口（泛指）', '我去街道口买苹果。'],
   ]
   for (const [name, text] of cases) {
     const out = await H.dispatch(text)
     if (out !== text) throw new Error(name + ' 误伤: ' + out)
+  }
+  const macOut = await H.dispatch('MAC地址AA:BB:CC:DD:EE:FF。')
+  if (!macOut.includes('[REDACTED_MAC_') || macOut.includes('[REDACTED_ADDR_')) throw new Error('MAC 地址分类错误: ' + macOut)
+})
+
+test('泛化机构/村镇与真实机构并存：误伤与覆盖', async () => {
+  const mustMask = [
+    ['常住地址链+姓名', '被告李小红常住贵州省毕节市七星关区碧阳大道12号。', '[REDACTED_ADDRCHAIN_'],
+    ['出生于+姓名', '被告张三出生于贵州省毕节市。', '[REDACTED_NAME_'],
+    ['住所无冒号+姓名', '被告李小红住所贵州省毕节市七星关区。', '[REDACTED_NAME_'],
+    ['及连接双姓名', '被告张三及李四共同向原告借款。', '[REDACTED_NAME_'],
+    ['括号姓名', '被告（李小红）于2024年5月向原告借款。', '[REDACTED_NAME_'],
+    ['姓名后接年份', '被告张三2024年9月1日与原告签订合同。', '[REDACTED_NAME_'],
+    ['全国人大常委会', '全国人大常委会审议通过。', '[REDACTED_ORG_'],
+    ['招商银行', '招商银行深圳分行出具了流水。', '[REDACTED_COMPANY_'],
+    ['毕节市第一中学', '毕节市第一中学。', '[REDACTED_COMPANY_'],
+    ['王家村（真实）', '王家村卫生室。', '[REDACTED_ADDRCHAIN_'],
+    ['名下房产', '查封被执行人张三名下的房产。', '[REDACTED_NAME_'],
+    ['未按履行', '被执行人李强未按生效判决履行义务。', '[REDACTED_NAME_'],
+    ['监护人', '法定代理人李强的监护人王芳。', '[REDACTED_NAME_'],
+    ['现住地址', '被告张三现住广东省深圳市南山区。', '[REDACTED_ADDR'],
+    ['住+街道链', '原告王小明，住广东省深圳市南山区粤海街道。', '[REDACTED_ADDRCHAIN_'],
+    ['住+道路链带门牌', '被告李小红住广东省深圳市南山区粤海街道12号。', '[REDACTED_ADDRCHAIN_'],
+    ['清华大学', '清华大学位于北京。', '[REDACTED_COMPANY_'],
+    ['协和医院', '北京协和医院。', '[REDACTED_COMPANY_'],
+    ['人民银行', '中国人民银行。', '[REDACTED_COMPANY_'],
+    ['门诊部机构', '出租给圣柏俐医疗美容门诊部使用。', '[REDACTED_COMPANY_'],
+    ['支行', '中国工商银行深圳南山支行。', '[REDACTED_COMPANY_'],
+    ['案外人', '案外人王芳提出执行异议。', '[REDACTED_NAME_'],
+    ['被告方', '被告方王五辩称。', '[REDACTED_NAME_'],
+    ['尚欠', '被告王五尚欠原告李四货款50000元。', '[REDACTED_NAME_'],
+    ['应于判项', '被告王五应于本判决生效之日起十日内支付原告李四货款。', '[REDACTED_NAME_'],
+    ['经传票传唤', '被告王五经传票传唤无正当理由拒不到庭。', '[REDACTED_NAME_'],
+    ['当事人', '我方当事人王五。', '[REDACTED_NAME_'],
+  ]
+  for (const [name, text, ph] of mustMask) {
+    const out = await H.dispatch(text)
+    if (!out.includes(ph)) throw new Error(name + ' 未脱敏: ' + out)
+    if ((await H.dispatch(out)) !== out) throw new Error(name + ' 不幂等: ' + out)
+  }
+  const mianOut = await H.dispatch('（面积1027.17平方米）出租给圣柏俐医疗美容门诊部使用。')
+  if (!mianOut.includes('平方米）出租给') || !mianOut.includes('[REDACTED_COMPANY_')) throw new Error('平方米前缀被吞: ' + mianOut)
+  const mustKeep = [
+    ['我住在链（保留介词）', '我住在北京市海淀区中关村大街。'],
+    ['住+链（保留介词）', '原告王小明，住广东省深圳市南山区粤海街道。'],
+  ]
+  for (const [name, text] of mustKeep) {
+    const out = await H.dispatch(text)
+    if (out === text) throw new Error(name + ' 未脱敏: ' + out)
+    if (!out.includes('住')) throw new Error(name + ' 介词被吞: ' + out)
+  }
+  const mustKeepSame = [
+    ['深圳有一所医院（泛指）', '深圳有一所医院。'],
+    ['北京的医院（泛指）', '北京的医院很多。'],
+  ]
+  for (const [name, text] of mustKeepSame) {
+    const out = await H.dispatch(text)
+    if (out !== text) throw new Error(name + ' 误伤: ' + out)
+  }
+})
+
+test('法律文书高频地址/含拉丁公司名：脱敏覆盖', async () => {
+  const cases = [
+    ['住所：完整地址', '住所：贵州省毕节市七星关区碧阳大道与深圳路交汇处奥莱国际购物中心4楼2F-(1-C)。', '[REDACTED_ADDR_'],
+    ['含拉丁公司名', '原告是毕节市奥莱国际Fmall购物中心商业运营管理的经营主体。', '[REDACTED_COMPANY_'],
+    ['城市名公司', '被告为广州白云山制药公司。', '[REDACTED_COMPANY_'],
+    ['行业词公司', '与云南白药制药公司签订合同。', '[REDACTED_COMPANY_'],
+    ['品牌公司', '被告为腾讯公司。', '[REDACTED_COMPANY_'],
+    ['拉丁品牌公司', '与华为Mate60公司合作。', '[REDACTED_COMPANY_'],
+  ]
+  for (const [name, text, ph] of cases) {
+    const out = await H.dispatch(text)
+    if (!out.includes(ph)) throw new Error(name + ' 未脱敏: ' + out)
+  }
+})
+
+test('地址链与多姓名：脱敏覆盖与误伤回归', async () => {
+  const mustMask = [
+    ['户籍地址', '户籍地址：浙江省杭州市西湖区文三路。', '[REDACTED_ADDR_'],
+    ['省市区道路链', '贵州省毕节市七星关区碧阳大道。', '[REDACTED_ADDRCHAIN_'],
+    ['实际控制人', '实际控制人：王芳。', '[REDACTED_NAME_'],
+    ['共同被告顿号', '被告 张伟、李强、王芳。', '[REDACTED_NAME_'],
+    ['编号被告', '被告一张三，被告二李四，被告1王五。', '[REDACTED_NAME_'],
+  ]
+  for (const [name, text, ph] of mustMask) {
+    const out = await H.dispatch(text)
+    if (!out.includes(ph)) throw new Error(name + ' 未脱敏: ' + out)
+  }
+  const mustKeep = [
+    ['机构名+路（非地址链）', '中国人民银行深圳市分行南山路'],
+    ['顿号后非姓名', '被告张三、依法享有权利。'],
+    ['水果公司（泛指）', '与水果公司协商。'],
+    ['编号被告无姓名', '被告一未到庭。'],
+  ]
+  for (const [name, text] of mustKeep) {
+    const out = await H.dispatch(text)
+    // 允许公司/街道被各自规则脱敏，但不得把整段当成地址链吞掉
+    if (out === '[REDACTED_ADDRCHAIN_') throw new Error(name + ' 误伤: ' + out)
+  }
+})
+
+test('机关全称识别：法院/检察院/公安分局完整脱敏', async () => {
+  const cases = [
+    ['市人民法院', '此致，毕节市七星关区人民法院。', '[REDACTED_ORG_'],
+    ['中级法院', '此致，北京市第一中级人民法院。', '[REDACTED_ORG_'],
+    ['最高法院', '此致，中华人民共和国最高人民法院。', '[REDACTED_ORG_'],
+    ['公安局+分局+派出所', '毕节市公安局七星关分局碧阳派出所。', '[REDACTED_ORG_'],
+    ['检察院', '此致，毕节市人民检察院。', '[REDACTED_ORG_'],
+    ['街道办事处', '中关村街道办事处的通知。', '[REDACTED_ORG_'],
+    ['居委会', '朝阳区和平里社区居民委员会。', '[REDACTED_ORG_'],
+    ['村委会', '正定县南楼村村民委员会。', '[REDACTED_ORG_'],
+  ]
+  for (const [name, text, ph] of cases) {
+    const out = await H.dispatch(text)
+    if (!out.includes(ph)) throw new Error(name + ' 未脱敏: ' + out)
+    if (/]DACTED_|\][A-Z]/.test(out)) throw new Error(name + ' 占位符异常: ' + out)
+  }
+})
+
+test('公司系动词与重叠后缀：覆盖与误伤回归', async () => {
+  const mustMask = [
+    ['该公司为', '该公司为广州白云山制药公司。', '[REDACTED_COMPANY_'],
+    ['公司系', '公司系腾讯公司。', '[REDACTED_COMPANY_'],
+    ['公司由', '该公司由北京字节跳动科技有限公司控股。', '[REDACTED_COMPANY_'],
+  ]
+  for (const [name, text, ph] of mustMask) {
+    const out = await H.dispatch(text)
+    if (!out.includes(ph)) throw new Error(name + ' 未脱敏: ' + out)
+    if (!/系|为|由/.test(out)) throw new Error(name + ' 系动词被吞: ' + out)
+  }
+  const mustKeep = [
+    ['该公司（保留）', '该公司与对方协商。'],
+    ['该公司为该合同担保', '该公司为该合同担保。'],
+  ]
+  for (const [name, text] of mustKeep) {
+    const out = await H.dispatch(text)
+    if (out !== text) throw new Error(name + ' 误伤: ' + out)
+  }
+})
+
+test('判决书主文：当事人姓名无上下文重复出现仍脱敏', async () => {
+  const doc = '上诉人李强因与被上诉人张伟民间借贷纠纷一案。判决如下：一、李强于本判决生效之日起十日内偿还张伟借款本金250000元；二、驳回张伟其他诉讼请求。审判长王芳、审判员陈志明、人民陪审员刘丽。'
+  const out = await H.dispatch(doc)
+  if (/李强|张伟|王芳|陈志明|刘丽/.test(out)) throw new Error('判决主文姓名未脱敏: ' + out)
+  if (!out.includes('250000') || !out.includes('民间借贷')) throw new Error('金额/案由被误伤: ' + out)
+  const out2 = await H.dispatch(out)
+  if (out2 !== out) throw new Error('判决书场景不幂等: ' + out2)
+})
+
+test('常见案由/角色/欠条借条/括号公司：脱敏覆盖', async () => {
+  const mustMask = [
+    ['民间借贷', '被告李强民间借贷纠纷一案。', '[REDACTED_NAME_'],
+    ['买卖合同', '被告王芳买卖合同纠纷。', '[REDACTED_NAME_'],
+    ['劳动争议', '被告李强劳动争议纠纷。', '[REDACTED_NAME_'],
+    ['物业服务', '被告张伟物业服务合同纠纷。', '[REDACTED_NAME_'],
+    ['申请执行人', '申请执行人中国工商银行股份有限公司。', '[REDACTED_COMPANY_'],
+    ['括号公司', '原告腾讯科技（深圳）有限公司。', '[REDACTED_COMPANY_'],
+    ['欠条', '欠条：今欠王强货款陆万元整（60000元）。欠款人：李明。', '[REDACTED_NAME_'],
+    ['借条', '借条：今借到刘芳人民币拾万元整。借款人：孙浩。', '[REDACTED_NAME_'],
+    ['继承', '被继承人王建国于2024年去世。继承人王芳、王强。', '[REDACTED_NAME_'],
+    ['交通事故', '原告赵磊诉被告平安保险公司机动车交通事故责任纠纷。事故认定书载明：赵磊负次要责任。', '[REDACTED_NAME_'],
+  ]
+  for (const [name, text, ph] of mustMask) {
+    const out = await H.dispatch(text)
+    if (!out.includes(ph)) throw new Error(name + ' 未脱敏: ' + out)
+    const out2 = await H.dispatch(out)
+    if (out2 !== out) throw new Error(name + ' 不幂等: ' + out2)
+  }
+  // 案由短语应保留（不得被吞进姓名占位符）
+  const keep = [
+    ['民间借贷', '被告李强民间借贷纠纷一案。', '民间借贷纠纷一案'],
+    ['买卖合同', '被告王芳买卖合同纠纷。', '买卖合同纠纷'],
+    ['劳动争议', '被告李强劳动争议纠纷。', '劳动争议纠纷'],
+    ['物业服务', '被告张伟物业服务合同纠纷。', '物业服务合同纠纷'],
+    ['交通事故', '原告赵磊诉被告平安保险公司机动车交通事故责任纠纷。', '机动车交通事故责任纠纷'],
+  ]
+  for (const [name, text, phrase] of keep) {
+    const out = await H.dispatch(text)
+    if (!out.includes(phrase)) throw new Error(name + ' 案由被吞: ' + out)
+  }
+})
+
+test('更多角色词与案由：转让/投保/居间/快递/赡养等', async () => {
+  const mustMask = [
+    ['股权转让', '转让方王芳与受让方陈志明签订股权转让协议。', '[REDACTED_NAME_'],
+    ['合伙散伙', '合伙人李明、合伙人赵磊散伙清算纠纷。', '[REDACTED_NAME_'],
+    ['保险投保', '投保人张伟向中国平安人寿保险股份有限公司申请理赔。', '[REDACTED_NAME_'],
+    ['居间', '居间人孙浩与委托人张伟居间合同纠纷。', '[REDACTED_NAME_'],
+    ['快递', '收件人王芳，寄件人李明。', '[REDACTED_NAME_'],
+    ['赡养', '原告王芳诉被告王强赡养纠纷。', '[REDACTED_NAME_'],
+    ['探望权', '原告张伟与被告李红探望权纠纷。', '[REDACTED_NAME_'],
+    ['相邻关系', '原告赵磊与被告孙浩相邻关系纠纷。', '[REDACTED_NAME_'],
+  ]
+  for (const [name, text, ph] of mustMask) {
+    const out = await H.dispatch(text)
+    if (!out.includes(ph)) throw new Error(name + ' 未脱敏: ' + out)
+    const out2 = await H.dispatch(out)
+    if (out2 !== out) throw new Error(name + ' 不幂等: ' + out2)
+  }
+})
+
+test('动词型姓名上下文与虚词过滤：覆盖与误伤', async () => {
+  const mustMask = [
+    ['查询姓名', '查询张伟的工商信息。', '[REDACTED_NAME_'],
+    ['搜索联系方式', '搜索王芳的联系方式。', '[REDACTED_NAME_'],
+    ['检索判决', '检索李强的判决文书。', '[REDACTED_NAME_'],
+  ]
+  for (const [name, text, ph] of mustMask) {
+    const out = await H.dispatch(text)
+    if (!out.includes(ph)) throw new Error(name + ' 未脱敏: ' + out)
+    if (!/的/.test(out)) throw new Error(name + ' 「的」被吞: ' + out)
+  }
+  const mustKeep = [
+    ['查询功能', '查询功能说明。'],
+    ['检索结果', '检索结果为空。'],
+    ['搜索页面', '搜索页面打不开。'],
+    ['了解情况', '了解情况后再说。'],
+    ['介绍信', '介绍信已开具。'],
+  ]
+  for (const [name, text] of mustKeep) {
+    const out = await H.dispatch(text)
+    if (out !== text) throw new Error(name + ' 误伤: ' + out)
+  }
+})
+
+test('IPv6 完整匹配与代码/时间/MAC 误伤防回归', async () => {
+  const mustMask = [
+    ['IPv6完整', 'IPv6 地址 2001:db8::ff00:42:8329。', '[REDACTED_IPV6_'],
+    ['IPv6双冒号', 'IPv6 地址 2001:db8::1。', '[REDACTED_IPV6_'],
+    ['IPv6全段', 'IPv6 地址 2001:0db8:85a3:0000:0000:8a2e:0370:7334。', '[REDACTED_IPV6_'],
+    ['分隔手机', '电话 138 0013 8000，手机 138-0013-8000。', '[REDACTED_MOBILE_'],
+  ]
+  for (const [name, text, ph] of mustMask) {
+    const out = await H.dispatch(text)
+    if (!out.includes(ph)) throw new Error(name + ' 未脱敏: ' + out)
+    if ((await H.dispatch(out)) !== out) throw new Error(name + ' 不幂等')
+  }
+  const mustKeep = [
+    ['时间', '时间 12:30:45。'],
+    ['C++作用域', 'std::vector<int> x。'],
+    ['命名空间', 'namespace a::b { }'],
+    ['裸双冒号', '注意：: 和 :: 的区别。'],
+    ['日期', '2024 01 31。'],
+  ]
+  for (const [name, text] of mustKeep) {
+    const out = await H.dispatch(text)
+    if (out !== text) throw new Error(name + ' 误伤: ' + out)
+  }
+})
+
+test('介词引导地址链与律师/金融借款案由', async () => {
+  const mustMask = [
+    ['名下位于', '查封被申请人名下位于广州市天河区体育西路的房产。', '[REDACTED_ADDRCHAIN_'],
+    ['我住在', '我住在北京市海淀区中关村大街。', '[REDACTED_ADDRCHAIN_'],
+    ['陈志明律师', '委托代理人陈志明律师。', '[REDACTED_NAME_'],
+    ['金融借款', '被申请人李强金融借款合同纠纷一案。', '[REDACTED_NAME_'],
+  ]
+  for (const [name, text, ph] of mustMask) {
+    const out = await H.dispatch(text)
+    if (!out.includes(ph)) throw new Error(name + ' 未脱敏: ' + out)
+    if ((await H.dispatch(out)) !== out) throw new Error(name + ' 不幂等')
+  }
+  const mustKeep = [
+    ['中关村街道', '北京市海淀区中关村街道。', ''],
+    ['机构+路', '中国人民银行深圳市分行南山路', ''],
+    ['律师职业', '他是一名律师。', ''],
+  ]
+  for (const [name, text] of mustKeep) {
+    const out = await H.dispatch(text)
+    if (out === '[REDACTED_ADDRCHAIN_') throw new Error(name + ' 误伤: ' + out)
   }
 })
 
