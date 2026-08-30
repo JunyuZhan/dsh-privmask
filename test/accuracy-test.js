@@ -143,6 +143,17 @@ test('泛化机构/村镇与真实机构并存：误伤与覆盖', async () => {
     ['应于判项', '被告王五应于本判决生效之日起十日内支付原告李四货款。', '[REDACTED_NAME_'],
     ['经传票传唤', '被告王五经传票传唤无正当理由拒不到庭。', '[REDACTED_NAME_'],
     ['当事人', '我方当事人王五。', '[REDACTED_NAME_'],
+    ['之父链', '被告张三之父王大明。', '[REDACTED_NAME_'],
+    ['之母链', '原告李小红之母刘芳。', '[REDACTED_NAME_'],
+    ['认可', '被告李小红认可该欠款事实。', '[REDACTED_NAME_'],
+    ['不认可', '被告李小红不认可该欠款事实。', '[REDACTED_NAME_'],
+    ['无异议', '被告王五无异议。', '[REDACTED_NAME_'],
+    ['同意', '被告王五同意分期还款。', '[REDACTED_NAME_'],
+    ['不同意', '被告王五不同意调解。', '[REDACTED_NAME_'],
+    ['无正当理由', '被告王五无正当理由拒不到庭。', '[REDACTED_NAME_'],
+    ['当庭陈述', '原告王小明当庭陈述。', '[REDACTED_NAME_'],
+    ['经合法传唤', '被告李小红经合法传唤未到庭。', '[REDACTED_NAME_'],
+    ['区级地址链', '住在天河区体育西路123号。', '[REDACTED_ADDRCHAIN_'],
   ]
   for (const [name, text, ph] of mustMask) {
     const out = await H.dispatch(text)
