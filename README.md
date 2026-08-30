@@ -17,6 +17,8 @@ DeepSeek Harness 本地脱敏插件：在请求发往云端大模型之前，将
 - [已知限制](#已知限制)
 - [测试与 CI](#测试与-ci)
 - [贡献](#贡献)
+- [安全](#安全)
+- [行为准则](#行为准则)
 - [发布](#发布)
 - [许可证](#许可证)
 
@@ -141,7 +143,8 @@ npm install dsh-privmask
 - **仅文本脱敏**：图片/文件等非文本内容默认剥离（不发送），不进行 OCR 或像素级处理；若启用 DeepSeek 多模态直发图片，需显式设置 `nonTextPolicy: allow` 并自行评估风险。
 - **启发式识别**：姓名/公司/地址等基于角色上下文、姓氏库与正则规则，复杂句式下可能漏检或误伤。
 - **自定义词表为精确子串匹配**：`customTerms` 中的词命中即脱敏，包含该词的长词同样命中（如词表含「张三」时「张三丰」也会被命中）；误报可用 `preserveValues` 标记放行。
-- **身份证严格校验**：默认仅校验位合法的 18 位号码被脱敏；校验位错误的号码会被放行（避免误伤订单号），若来源数据可能被抄错/OCR 错位，可关闭 `strictId18`。
+- **证件/信用代码校验**：带「身份证号/统一社会信用代码」等明确标注的号码**始终脱敏**（不依赖校验位）；
+  无上下文的号码默认仅校验位合法者脱敏（避免误伤订单号），可关闭 `strictId18` 或加入自定义词表兜底。
 - **文件名与路径默认保留**（`redactPaths: false`），开启后文件类工具链会断裂。
 - **日志中模型回复为真值**：方案取舍下 assistant 消息（模型回显的姓名/公司等）与工具调用参数在日志中为真值；如需日志完全无明文，需关闭入站还原或使用更严格的落盘方案。
 - **`agent/inbox/spliced` 事件保留用户消息原文**：dsh 在用户消息进入 inbox 队列时以原文落盘该会话事件，该事件早于 `agent/pre-step` 且无插件改写缝（`session/event` 为只读观察），privmask 无法遮罩这一份日志副本；模型上下文与出站请求仍使用遮罩后的 `user/message`，不受影响。
@@ -152,8 +155,8 @@ npm install dsh-privmask
 
 ```sh
 node test/self-test.js        # 14 项功能回归（端到端拦截 + 中文实体）
-node test/reliability-test.js # 131 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/词表热更新）
-node test/accuracy-test.js    # 23 项准确性（法律文档矩阵/凭据/PII校验/边界/配置/幂等/性能/高频地址与拉丁公司名/泛化机构与村镇/姓名标签边界）
+node test/reliability-test.js # 132 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/词表热更新/字符串 content 还原）
+node test/accuracy-test.js    # 26 项准确性（法律文档矩阵/凭据/PII校验/证件与信用代码上下文/复姓/泛化机构与村镇/姓名标签边界/客户端版本一致性）
 node test/fuzz-test.js        # 300 例随机文本 × 2 断言（不崩 + 幂等，共 600 断言）
 ```
 
@@ -172,9 +175,19 @@ npm run mask:preview -- 案情.txt --redactFacts   # 全面档：姓名/公司/�
 
 ## 贡献
 
-- 发现漏检/误伤或功能建议：提交 [Issue](https://github.com/JunyuZhan/dsh-privmask/issues)
+- 开发/提交流程见 [CONTRIBUTING.md](CONTRIBUTING.md)
+- 发现漏检/误伤或功能建议：提交 [Issue](https://github.com/JunyuZhan/dsh-privmask/issues)（附测试样例，便于回归）
 - 改进规则或修复 bug：提交 [PR](https://github.com/JunyuZhan/dsh-privmask/pulls)
-- 提交前请确保三套测试全部通过
+- 提交前请确保四套测试全部通过（`self/accuracy/reliability/fuzz`）
+
+## 安全
+
+本插件以「云端与日志不见明文」为安全目标。发现隐私泄漏、绕过脱敏或安全缺陷时，
+请按 [SECURITY.md](SECURITY.md) 报告（不要在公开 Issue 中贴真实敏感数据）。
+
+## 行为准则
+
+参与本项目即表示同意 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)。
 
 ## 发布
 
