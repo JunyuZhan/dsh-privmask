@@ -525,6 +525,12 @@ test('USCC 上下文：校验位非法仍脱敏、裸编号不误伤', async () 
   if (!okCtx2.includes('[REDACTED_USCC_')) throw new Error('信用代码上下文漏脱敏: ' + okCtx2)
   const bare = await H.dispatch('编号 12345678901234567X') // 裸「编号」不作触发词
   if (!bare.includes('12345678901234567X')) throw new Error('裸编号被误伤: ' + bare)
+  for (const ctx of ['USCC：', '营业执照号 ', '营业执照注册号：', '社会信用代码 ']) {
+    const o = await H.dispatch(ctx + '12345678901234567X')
+    if (!o.includes('[REDACTED_USCC_')) throw new Error('上下文漏脱敏: ' + ctx + o)
+  }
+  const validUnderBianhao = await H.dispatch('编号 91310000MA1FL4XXX0') // 合法 USCC 即使「编号」引导也脱敏
+  if (!validUnderBianhao.includes('[REDACTED_USCC_')) throw new Error('合法 USCC 漏脱敏: ' + validUnderBianhao)
 })
 
 test('中国即时通讯/执业标识：上下文识别不误伤', async () => {
