@@ -162,6 +162,10 @@ test('泛化机构/村镇与真实机构并存：误伤与覆盖', async () => {
     ['别名', '被执行人李强（别名李二强）。', '[REDACTED_NAME_'],
     ['曾用名', '原告王小明，曾用名王小刚。', '[REDACTED_NAME_'],
     ['三字名以强结尾', '被告张三强。', '[REDACTED_NAME_'],
+    ['到庭参加诉讼', '原告王小明到庭参加诉讼。', '[REDACTED_NAME_'],
+    ['出庭应诉', '被告李小红出庭应诉。', '[REDACTED_NAME_'],
+    ['当庭出示', '原告王小明当庭出示借条。', '[REDACTED_NAME_'],
+    ['出庭作证', '证人王五出庭作证。', '[REDACTED_NAME_'],
   ]
   for (const [name, text, ph] of mustMask) {
     const out = await H.dispatch(text)
