@@ -194,6 +194,9 @@ test('泛化机构/村镇与真实机构并存：误伤与覆盖', async () => {
     ['贵州茅台', '贵州茅台酒厂（集团）有限责任公司。', '[REDACTED_COMPANY_'],
     ['贵州高院', '向贵州省高级人民法院申请再审。', '[REDACTED_ORG_'],
     ['本溪钢铁', '本溪钢铁公司。', '[REDACTED_COMPANY_'],
+    ['华南区（大区）', '他负责华南区的销售业务。', ''],
+    ['大湾区（宏观）', '大湾区建设提速。', ''],
+    ['乡村振兴（政策）', '乡村振兴战略实施。', ''],
   ]
   for (const [name, text, ph] of mustMask) {
     const out = await H.dispatch(text)
