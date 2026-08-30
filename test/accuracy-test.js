@@ -183,6 +183,11 @@ test('泛化机构/村镇与真实机构并存：误伤与覆盖', async () => {
     ['户口所在地', '被告李小红户口所在地：浙江省杭州市。', '[REDACTED_ADDR_'],
     ['空格座机', '电话：0755 12345678。', '[REDACTED_TEL_'],
     ['无分隔座机', '电话：01012345678。', '[REDACTED_TEL_'],
+    ['申请保全人', '申请保全人王五。', '[REDACTED_NAME_'],
+    ['抵押权人', '抵押权人李四。', '[REDACTED_NAME_'],
+    ['质押权人', '质押权人王五。', '[REDACTED_NAME_'],
+    ['保证人', '保证人李四。', '[REDACTED_NAME_'],
+    ['权利人', '权利人王五。', '[REDACTED_NAME_'],
   ]
   for (const [name, text, ph] of mustMask) {
     const out = await H.dispatch(text)
