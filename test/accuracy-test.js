@@ -154,6 +154,14 @@ test('泛化机构/村镇与真实机构并存：误伤与覆盖', async () => {
     ['当庭陈述', '原告王小明当庭陈述。', '[REDACTED_NAME_'],
     ['经合法传唤', '被告李小红经合法传唤未到庭。', '[REDACTED_NAME_'],
     ['区级地址链', '住在天河区体育西路123号。', '[REDACTED_ADDRCHAIN_'],
+    ['出具的证明', '被告王五出具的证明。', '[REDACTED_NAME_'],
+    ['持有的股份', '被告王五持有的股份。', '[REDACTED_NAME_'],
+    ['所有的房产', '原告王小明所有的房产。', '[REDACTED_NAME_'],
+    ['所在地', '被告王五所在地。', '[REDACTED_NAME_'],
+    ['又名', '被告王五（又名王老五）。', '[REDACTED_NAME_'],
+    ['别名', '被执行人李强（别名李二强）。', '[REDACTED_NAME_'],
+    ['曾用名', '原告王小明，曾用名王小刚。', '[REDACTED_NAME_'],
+    ['三字名以强结尾', '被告张三强。', '[REDACTED_NAME_'],
   ]
   for (const [name, text, ph] of mustMask) {
     const out = await H.dispatch(text)
