@@ -518,6 +518,15 @@ test('PII 校验位：合法脱敏、非法放行', async () => {
   if (!ctxBad.includes('[REDACTED_ID18_')) throw new Error('上下文身份证漏脱敏: ' + ctxBad)
 })
 
+test('USCC 上下文：校验位非法仍脱敏、裸编号不误伤', async () => {
+  const okCtx = await H.dispatch('统一社会信用代码 12345678901234567X') // 校验位非法但有明确标注
+  if (!okCtx.includes('[REDACTED_USCC_')) throw new Error('上下文 USCC 漏脱敏: ' + okCtx)
+  const okCtx2 = await H.dispatch('信用代码：12345678901234567X')
+  if (!okCtx2.includes('[REDACTED_USCC_')) throw new Error('信用代码上下文漏脱敏: ' + okCtx2)
+  const bare = await H.dispatch('编号 12345678901234567X') // 裸「编号」不作触发词
+  if (!bare.includes('12345678901234567X')) throw new Error('裸编号被误伤: ' + bare)
+})
+
 test('中国即时通讯/执业标识：上下文识别不误伤', async () => {
   const out = await H.dispatch('微信号：alice_wang123，QQ号 12345678，律师执业证号 14401000000000000，普通文本 abc123')
   if (!out.includes('[REDACTED_WECHAT_1]') || !out.includes('[REDACTED_QQ_1]') || !out.includes('[REDACTED_CERTID_1]')) throw new Error('标识未脱敏: ' + out)
