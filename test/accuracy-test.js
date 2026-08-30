@@ -208,6 +208,10 @@ test('泛化机构/村镇与真实机构并存：误伤与覆盖', async () => {
     ['经本院合法传唤', '被告王五经本院合法传唤未到庭。', '[REDACTED_NAME_'],
     ['立即返还', '判令被告李小红立即返还借款。', '[REDACTED_NAME_'],
     ['应返还', '被告李小红应返还原告王小明借款。', '[REDACTED_NAME_'],
+    ['村委会主任', '村民委员会主任王五。', '[REDACTED_NAME_'],
+    ['支部书记', '村党支部书记李四。', '[REDACTED_NAME_'],
+    ['会计', '会计王五。', '[REDACTED_NAME_'],
+    ['出纳', '出纳李四。', '[REDACTED_NAME_'],
   ]
   for (const [name, text, ph] of mustMask) {
     const out = await H.dispatch(text)
