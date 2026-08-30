@@ -531,6 +531,10 @@ test('USCC 上下文：校验位非法仍脱敏、裸编号不误伤', async () 
   }
   const validUnderBianhao = await H.dispatch('编号 91310000MA1FL4XXX0') // 合法 USCC 即使「编号」引导也脱敏
   if (!validUnderBianhao.includes('[REDACTED_USCC_')) throw new Error('合法 USCC 漏脱敏: ' + validUnderBianhao)
+  const lowerCtx = await H.dispatch('统一社会信用代码 12345678901234567x') // 明确标注 + 小写 x 也脱敏
+  if (!lowerCtx.includes('[REDACTED_USCC_')) throw new Error('小写上下文 USCC 漏脱敏: ' + lowerCtx)
+  const lowerBianhao = await H.dispatch('编号 12345678901234567x') // 泛化标签 + 小写仍不触发
+  if (!lowerBianhao.includes('12345678901234567x')) throw new Error('泛化标签小写被误伤: ' + lowerBianhao)
 })
 
 test('中国即时通讯/执业标识：上下文识别不误伤', async () => {
