@@ -3,6 +3,18 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.26] - 2026-08-30
+
+### 修复（第三十五轮：卡片版本号）
+
+- 隐私保护卡片新增「插件版本：vX.Y.Z」展示，用户可确认当前运行的插件版本
+- 新增一致性测试：lib/client.js 的 PLUGIN_VERSION 必须与 package.json 相同，
+  防止发版时版本号漂移
+
+### 测试
+
+- accuracy-test 新增 客户端卡片版本号与 package.json 一致 回归
+
 ## [0.2.25] - 2026-08-30
 
 ### 修复（第三十四轮：复姓识别）

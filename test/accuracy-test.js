@@ -581,6 +581,15 @@ test('复姓：司马/诸葛/上官/慕容等完整识别', async () => {
   if (!main.includes('[REDACTED_NAME_') || !main.includes('民间借贷')) throw new Error('复姓判决主文异常: ' + main)
 })
 
+test('客户端卡片版本号与 package.json 一致', async () => {
+  const fs = await import('node:fs')
+  const client = fs.readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8')
+  const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+  if (!client.includes('PLUGIN_VERSION = "' + pkg.version + '"')) {
+    throw new Error('client.js 版本号与 package.json 不一致: package=' + pkg.version)
+  }
+})
+
 test('配置矩阵：全面脱敏档', async () => {
   const Hf = makeHarness({ logRedactions: false, redactNames: true, redactCompanies: true, redactOrgs: true })
   const out = await Hf.dispatch('原告张三，被告李四，公司为深圳市南山科技有限公司')
