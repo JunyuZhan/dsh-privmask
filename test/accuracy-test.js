@@ -105,6 +105,14 @@ test('PII 校验位：合法脱敏、非法放行', async () => {
   if (!bad.includes('12345678901234567X')) throw new Error('非法身份证被误脱敏')
 })
 
+test('中国即时通讯/执业标识：上下文识别不误伤', async () => {
+  const out = await H.dispatch('微信号：alice_wang123，QQ号 12345678，律师执业证号 14401000000000000，普通文本 abc123')
+  if (!out.includes('[REDACTED_WECHAT_1]') || !out.includes('[REDACTED_QQ_1]') || !out.includes('[REDACTED_CERTID_1]')) throw new Error('标识未脱敏: ' + out)
+  if (!out.includes('普通文本 abc123')) throw new Error('误伤普通文本: ' + out)
+  const noValue = await H.dispatch('微信号 之间的内容')
+  if (noValue !== '微信号 之间的内容') throw new Error('无值上下文误伤: ' + noValue)
+})
+
 test('姓名/公司/机关边界', async () => {
   const cn = (...cps) => String.fromCharCode(...cps)
   const zhan = cn(0x8a79, 0x6c38, 0x98de) // 詹永飞
