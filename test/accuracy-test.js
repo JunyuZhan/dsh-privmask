@@ -217,6 +217,11 @@ test('泛化机构/村镇与真实机构并存：误伤与覆盖', async () => {
     ['原告人', '附带民事诉讼原告人王五。', '[REDACTED_NAME_'],
     ['被害人', '被害人王五。', '[REDACTED_NAME_'],
     ['举报人', '举报人王五。', '[REDACTED_NAME_'],
+    ['铁路运输法院', '北京铁路运输法院。', '[REDACTED_ORG_'],
+    ['互联网法院', '广州互联网法院。', '[REDACTED_ORG_'],
+    ['知识产权法院', '北京知识产权法院。', '[REDACTED_ORG_'],
+    ['金融法院', '上海金融法院。', '[REDACTED_ORG_'],
+    ['海事法院', '大连海事法院。', '[REDACTED_ORG_'],
   ]
   for (const [name, text, ph] of mustMask) {
     const out = await H.dispatch(text)
