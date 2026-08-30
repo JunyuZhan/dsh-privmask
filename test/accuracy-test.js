@@ -202,6 +202,10 @@ test('泛化机构/村镇与真实机构并存：误伤与覆盖', async () => {
     ['纳入失信', '将被执行人王五纳入失信被执行人名单。', '[REDACTED_NAME_'],
     ['有履行能力', '被执行人王五有履行能力而拒不履行。', '[REDACTED_NAME_'],
     ['迟延履行', '被执行人王五迟延履行期间的债务利息。', '[REDACTED_NAME_'],
+    ['加倍支付', '被告王五加倍支付迟延履行期间的债务利息。', '[REDACTED_NAME_'],
+    ['逾期未履行', '被告王五逾期未履行还款义务。', '[REDACTED_NAME_'],
+    ['逾期未付款', '被告王五逾期未付款。', '[REDACTED_NAME_'],
+    ['经本院合法传唤', '被告王五经本院合法传唤未到庭。', '[REDACTED_NAME_'],
   ]
   for (const [name, text, ph] of mustMask) {
     const out = await H.dispatch(text)
