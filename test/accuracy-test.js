@@ -244,6 +244,10 @@ test('泛化机构/村镇与真实机构并存：误伤与覆盖', async () => {
     ['城市管理局', '深圳市城市管理局。', '[REDACTED_ORG_'],
     ['管理委员会', '中关村科技园区管理委员会。', '[REDACTED_ORG_'],
     ['市中心（泛指）', '在市中心吃饭。', ''],
+    ['公证处', '北京市公证处。', '[REDACTED_ORG_'],
+    ['鉴定所', '司法鉴定所。', '[REDACTED_ORG_'],
+    ['看守所', '深圳市看守所。', '[REDACTED_ORG_'],
+    ['拘留所', '行政拘留所。', '[REDACTED_ORG_'],
   ]
   for (const [name, text, ph] of mustMask) {
     const out = await H.dispatch(text)
