@@ -180,6 +180,7 @@ test('泛化机构/村镇与真实机构并存：误伤与覆盖', async () => {
     ['区分局', '深圳市公安局南山区分局。', '[REDACTED_ORG_'],
     ['派出所独立', '碧阳派出所。', '[REDACTED_ORG_'],
     ['人民法庭', '七星关区人民法院碧阳人民法庭。', '[REDACTED_ORG_'],
+    ['户口所在地', '被告李小红户口所在地：浙江省杭州市。', '[REDACTED_ADDR_'],
   ]
   for (const [name, text, ph] of mustMask) {
     const out = await H.dispatch(text)
