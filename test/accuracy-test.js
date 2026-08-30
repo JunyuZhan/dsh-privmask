@@ -561,6 +561,26 @@ test('姓名/公司/机关边界', async () => {
   }
 })
 
+test('复姓：司马/诸葛/上官/慕容等完整识别', async () => {
+  const cases = [
+    '原告欧阳娜、司马光、诸葛亮、上官婉儿。',
+    '被告慕容复、东方不败、独孤求败。',
+    '原告夏侯惇、皇甫嵩、公孙瓒。',
+    '被告司徒雷登、尉迟恭、宇文成都。',
+  ]
+  for (const text of cases) {
+    const out = await H.dispatch(text)
+    const names = (text.match(/[一-龥]{2,4}(?=[、。])/g) || []).length
+    const phs = (out.match(/\[REDACTED_NAME_\d+\]/g) || []).length
+    if (phs < names) throw new Error('复姓漏脱敏: ' + text + ' => ' + out)
+    if ((await H.dispatch(out)) !== out) throw new Error('复姓不幂等: ' + out)
+  }
+  const tail = await H.dispatch('被告司马光住址：北京市朝阳区。')
+  if (!tail.includes('[REDACTED_NAME_')) throw new Error('复姓+尾词漏脱敏: ' + tail)
+  const main = await H.dispatch('原告司马光与被告欧阳娜民间借贷纠纷一案。判决如下：一、司马光偿还欧阳娜借款。')
+  if (!main.includes('[REDACTED_NAME_') || !main.includes('民间借贷')) throw new Error('复姓判决主文异常: ' + main)
+})
+
 test('配置矩阵：全面脱敏档', async () => {
   const Hf = makeHarness({ logRedactions: false, redactNames: true, redactCompanies: true, redactOrgs: true })
   const out = await Hf.dispatch('原告张三，被告李四，公司为深圳市南山科技有限公司')
