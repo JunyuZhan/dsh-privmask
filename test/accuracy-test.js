@@ -191,6 +191,9 @@ test('泛化机构/村镇与真实机构并存：误伤与覆盖', async () => {
     ['欠（动词）', '被告王五欠原告李四货款。', '[REDACTED_NAME_'],
     ['冻结其在银行', '冻结其在中国工商银行深圳南山支行的存款。', '[REDACTED_COMPANY_'],
     ['在招商银行', '在招商银行开户。', '[REDACTED_COMPANY_'],
+    ['贵州茅台', '贵州茅台酒厂（集团）有限责任公司。', '[REDACTED_COMPANY_'],
+    ['贵州高院', '向贵州省高级人民法院申请再审。', '[REDACTED_ORG_'],
+    ['本溪钢铁', '本溪钢铁公司。', '[REDACTED_COMPANY_'],
   ]
   for (const [name, text, ph] of mustMask) {
     const out = await H.dispatch(text)
