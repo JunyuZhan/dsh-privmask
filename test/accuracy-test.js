@@ -206,6 +206,8 @@ test('泛化机构/村镇与真实机构并存：误伤与覆盖', async () => {
     ['逾期未履行', '被告王五逾期未履行还款义务。', '[REDACTED_NAME_'],
     ['逾期未付款', '被告王五逾期未付款。', '[REDACTED_NAME_'],
     ['经本院合法传唤', '被告王五经本院合法传唤未到庭。', '[REDACTED_NAME_'],
+    ['立即返还', '判令被告李小红立即返还借款。', '[REDACTED_NAME_'],
+    ['应返还', '被告李小红应返还原告王小明借款。', '[REDACTED_NAME_'],
   ]
   for (const [name, text, ph] of mustMask) {
     const out = await H.dispatch(text)
