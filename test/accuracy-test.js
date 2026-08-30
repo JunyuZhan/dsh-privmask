@@ -166,6 +166,10 @@ test('泛化机构/村镇与真实机构并存：误伤与覆盖', async () => {
     ['出庭应诉', '被告李小红出庭应诉。', '[REDACTED_NAME_'],
     ['当庭出示', '原告王小明当庭出示借条。', '[REDACTED_NAME_'],
     ['出庭作证', '证人王五出庭作证。', '[REDACTED_NAME_'],
+    ['户籍所在地', '被告李小红，户籍所在地：浙江省杭州市西湖区。', '[REDACTED_ADDR_'],
+    ['户籍所在地市级', '被告李小红，户籍所在地：浙江省杭州市。', '[REDACTED_ADDR_'],
+    ['实际居住地', '被告李小红实际居住地：北京市朝阳区建国路88号。', '[REDACTED_ADDR_'],
+    ['仲裁院', '深圳国际仲裁院。', '[REDACTED_ORG_'],
   ]
   for (const [name, text, ph] of mustMask) {
     const out = await H.dispatch(text)
