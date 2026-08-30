@@ -3,7 +3,7 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [Unreleased] - 2026-08-30
+## [0.2.19] - 2026-08-30
 
 ### 修复（第二十八轮：脱敏覆盖）
 
