@@ -2,6 +2,7 @@
 // 运行：node test/accuracy-test.js
 import test from 'node:test'
 import { apply } from '../lib/index.js'
+import { createEngine } from '../lib/engine.js'
 
 function makeHarness(config) {
   let listener = null
@@ -757,4 +758,23 @@ test('性能阈值', async () => {
   await H.dispatch('普通法律文书文本没有敏感信息的重复填充。'.repeat(4000))
   const cost2 = Date.now() - t1
   if (cost2 > 2000) throw new Error('纯文本超时: ' + cost2 + 'ms')
+  // 超长无空白 ASCII 运行守卫：约 3MB 可正常脱敏；>4MB 必须明确报错而非 V8 正则栈溢出
+  const guardCfg = {
+    persistMapping: true, nonTextPolicy: 'strip', strictUnknown: true, preserveValues: [],
+    redactToolMeta: false, dropSessionId: true, redactCredentials: true, redactNames: true,
+    redactAddress: true, redactCompanies: true, redactOrgs: true, redactCaseNumbers: false,
+    redactDob: false, cnEntities: true, strictId18: true, longTokens: true, redactPaths: false,
+    customTerms: [], enabled: true,
+  }
+  const guardEng = createEngine(guardCfg)
+  const rctx = { maps: new Map(), seq: new Map(), counts: new Map(), fields: 0 }
+  const ok3mb = guardEng.redactText('a1B2'.repeat(750000), { ...rctx, maps: new Map(), seq: new Map(), counts: new Map(), fields: 0 })
+  if (!ok3mb.text.includes('[REDACTED_HEX_')) throw new Error('3MB 长串未正常脱敏')
+  let guardThrew = false
+  try {
+    guardEng.redactText('a1B2'.repeat(1200000), { ...rctx, maps: new Map(), seq: new Map(), counts: new Map(), fields: 0 })
+  } catch (e) {
+    guardThrew = /超长无空白 ASCII/.test(String(e && e.message ? e.message : e))
+  }
+  if (!guardThrew) throw new Error('超长无空白 ASCII 未按守卫拒绝（可能触发正则栈溢出）')
 })

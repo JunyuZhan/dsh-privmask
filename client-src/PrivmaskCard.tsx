@@ -49,6 +49,7 @@ const inputBase: React.CSSProperties = {
   color: 'inherit',
 }
 const errorStyle: React.CSSProperties = { fontSize: 12, color: '#e5484d' }
+const linkStyle: React.CSSProperties = { color: 'inherit' }
 
 export function PrivmaskCard(props: PrivmaskCardInjected) {
   const [enabled, setEnabled] = useState<boolean | null>(null)
@@ -290,6 +291,12 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
       </div>
       <div style={body}>复制后在终端运行该命令，并重启 dsh web 生效。</div>
       <div style={body}>此处为常用开关；案号/出生日期/严格模式等其余选项请在配置文件中调整（$DSH_HOME/profiles/web/cordis.patch.yml）。</div>
+      <div style={body}>
+        作者：JunyuZhan · 项目：
+        <a style={linkStyle} href="https://github.com/JunyuZhan/dsh-privmask" target="_blank" rel="noreferrer">GitHub</a>
+        {' '}· 问题反馈：
+        <a style={linkStyle} href="https://github.com/JunyuZhan/dsh-privmask/issues" target="_blank" rel="noreferrer">Issues</a>
+      </div>
     </div>
   )
 }

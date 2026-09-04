@@ -168,6 +168,17 @@ node test/fuzz-test.js        # 300 例随机文本 × 2 断言（不崩 + 幂�
 
 CI（GitHub Actions，Node 18/20/22）在每次 push / PR 时自动运行全部测试（`node:test` 结构化报告）。
 
+## 诊断与统计
+
+- **控制台日志**：所有关键动作以 `[privmask]` 前缀输出，如启动配置、每次脱敏统计
+  （类别与次数）、非文本拦截原因、运行时设置 live 更新等；`logRedactions: false` 时仅保留错误与告警。
+- **结构化事件**：每次请求/落盘遮罩/拦截/还原未命中都会发出 `privmask/stats` 事件
+  （`ctx.emit`），`kind` 为 `redacted / logRedacted / blocked / error / restoreMiss / settingsUpdated` 等。
+- **还原未命中**：模型返回无法还原的占位符时（映射被逐出或模型改写），日志会给出
+  sessionId、未命中数量与最多 3 个占位符样例，便于判断是否因会话超长逐出导致。
+- **诊断文件**：启动与还原关键路径另写一份 `$DSH_HOME/privmask-restore.log`（默认 `~/.dsh/`），
+  用于在无控制台可读的真实环境（如 LaunchAgent）排查入站还原问题。
+
 ## 脱敏对照工具
 
 本地检查一份文本在脱敏前后的样子（不会发送任何数据）：
