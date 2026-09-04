@@ -16,20 +16,10 @@ export const NS = 'settings.privmask'
 
 const zh: Record<string, string> = {
   tab: '隐私保护',
-  on: '已开启',
-  off: '已关闭',
-  unknown: '状态未知',
-  desc: '发往云端前，姓名、身份证、电话、邮箱、地址、公司/单位名称与密钥凭据会被替换为占位符；案号、出生日期、涉案金额保留。',
-  update: '更新：dsh plugin --profile web update dsh-privmask，然后重启 dsh web。',
 }
 
 const en: Record<string, string> = {
   tab: 'Privacy',
-  on: 'On',
-  off: 'Off',
-  unknown: 'Unknown',
-  desc: 'Before sending to the cloud, names, IDs, phones, emails, addresses, companies and credentials are replaced with placeholders; case numbers, birth dates and amounts are kept.',
-  update: 'Update: dsh plugin --profile web update dsh-privmask, then restart dsh web.',
 }
 
 /**

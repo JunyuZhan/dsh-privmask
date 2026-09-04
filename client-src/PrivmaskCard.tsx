@@ -108,6 +108,7 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
 
   const field = (key: string): boolean => Boolean(cfg?.[key])
   const factsOn = field('redactNames') && field('redactCompanies') && field('redactOrgs')
+  const factsSomeOn = field('redactNames') || field('redactCompanies') || field('redactOrgs')
   const toggleFacts = async () => {
     if (cfg === null || saving !== null) return
     setSaving('facts')
@@ -149,12 +150,19 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
     }
   }
 
+  /** 一次可添加多个词：以 ; ； , ， 、 换行 分隔，自动去重并忽略空项 */
+  const TERM_SPLIT = /[;；,，、\n]+/
   const addTerm = () => {
-    const t = termInput.trim()
-    if (!t) return
-    if (terms.includes(t)) { setTermInput(''); return }
+    const raw = termInput.trim()
+    if (!raw) return
+    const next = [...terms]
+    for (const part of raw.split(TERM_SPLIT)) {
+      const t = part.trim()
+      if (t && !next.includes(t)) next.push(t)
+    }
+    if (next.length === terms.length) { setTermInput(''); return }
     setTermInput('')
-    void saveTerms([...terms, t])
+    void saveTerms(next)
   }
 
   const removeTerm = (t: string) => {
@@ -179,7 +187,9 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
     )
   }
 
-  const label = enabled === true ? '已开启' : enabled === false ? '已关闭' : '状态未知'
+  // 顶部展示的是“插件装载状态”，与下方配置项“总开关（已开启/已关闭）”语义不同，
+  // 用“已启用/未启用”措辞区分，避免关闭总开关后顶部仍显示“已开启”的困惑。
+  const label = enabled === true ? '插件已启用' : enabled === false ? '插件未启用' : '插件状态未知'
   return (
     <div style={row}>
       <div style={title}>隐私保护：{label}</div>
@@ -187,14 +197,14 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
         <>
           {switchRow('enabled', '总开关')}
           <div style={line}>
-            <span>全面脱敏（姓名/公司/机关）：{factsOn ? '已开启' : '已关闭'}</span>
+            <span>全面脱敏（姓名/公司/机关）：{factsOn ? '已开启' : factsSomeOn ? '部分开启' : '已关闭'}</span>
             <button
               type="button"
               disabled={!writable || saving !== null}
               style={{ ...btnBase, opacity: writable ? 1 : 0.5 }}
               onClick={toggleFacts}
             >
-              {factsOn ? '关闭' : '开启'}
+              {factsOn ? '关闭' : '全部开启'}
             </button>
           </div>
           {switchRow('redactAddress', '地址')}
@@ -205,7 +215,7 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
               <input
                 style={inputBase}
                 value={termInput}
-                placeholder="输入敏感词，回车或点添加"
+                placeholder="输入敏感词（可用 ; ； , ， 、 分隔一次添加多个），回车或点添加"
                 onChange={(e) => setTermInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') addTerm() }}
               />
@@ -236,10 +246,10 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
         <div style={body}>运行时开关不可用（settings 未挂载时保持配置文件模式）。{error ? ' ' + error : ''}</div>
       )}
       <div style={body}>
-        发往云端前，姓名、身份证、电话、邮箱、地址、公司/单位名称与密钥凭据会被替换为占位符；
-        涉案金额、日期、案号保留（便于金额核算与时效判断）。本地会话日志中的用户输入与工具结果同样遮罩。
+        发往云端前，姓名、身份证、电话、邮箱、地址、公司/单位名称与密钥凭据会被替换为占位符；涉案金额、日期、案号保留（便于金额核算与时效判断）。本地会话日志中的用户输入与工具结果同样遮罩。
       </div>
       <div style={body}>更新：dsh plugin --profile web update dsh-privmask，然后重启 dsh web。</div>
+      <div style={body}>此处为常用开关；案号/出生日期/严格模式等其余选项请在配置文件中调整（$DSH_HOME/profiles/web/cordis.patch.yml）。</div>
     </div>
   )
 }
