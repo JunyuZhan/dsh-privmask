@@ -3,6 +3,14 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.35] - 2026-09-04
+
+### 修复（第四十二轮：还原未命中统计）
+
+- 入站还原未命中计数不再把同一占位符在 text-delta 与 block-end 各计一次：
+  改为只在权威的 block-end 与流尾收尾统计，日志/事件里的“未命中数量”不再虚高；
+- 新增 V5 回归（reliability 137 → 138），断言 count=1 且样例含该占位符。
+
 ## [0.2.34] - 2026-09-04
 
 ### 修复（第四十一轮：userinfo 误伤面）

@@ -692,6 +692,37 @@ const VC3 = compatHarness({ logRedactions: false });
 const v3 = await VC3.llmFn({ provider: 't', model: 'm', sessionId: 's', messages: [{ role: 'user', content: [{ type: 'text', text: '邮箱 ' + S.email }] }] }, () => (async function* () { yield { type: 'finish', reason: { kind: 'stop' } }; })());
 for await (const _ of v3) {}
 t('V4 emit 结构化事件', VC3.emitted.some(([name, p]) => name === 'privmask/stats' && p.kind === 'redacted' && p.fields >= 1), JSON.stringify(VC3.emitted));
+// V5：未命中占位符只在权威 block-end 统计一次（delta 与 block-end 不应重复计数）
+const missHarness = (() => {
+  let listener = null;
+  const emitted = [];
+  const canned = [
+    { type: 'text-delta', index: 0, text: '回显 [REDACTED_EMAIL_99] 结束' },
+    { type: 'block-end', index: 0, block: { type: 'text', text: '回显 [REDACTED_EMAIL_99] 结束' } },
+    { type: 'finish', reason: { kind: 'stop' } },
+  ];
+  const llmStub = { stream: () => (async function* () { for (const c of canned) yield c; })() };
+  const ctx = {
+    on(n, f) { if (n === 'llm/stream') listener = f; return () => {}; },
+    get(n) { return n === 'llm' ? llmStub : undefined; },
+    emit(n, p) { emitted.push([n, p]); },
+  };
+  apply(ctx, { logRedactions: false });
+  return {
+    emitted,
+    async run() {
+      const gen = listener(
+        { provider: 't', model: 'm', sessionId: 's-miss', messages: [{ role: 'user', content: [{ type: 'text', text: '邮箱 ' + P_EMAIL }] }] },
+        () => (async function* () { yield { type: 'finish', reason: { kind: 'stop' } }; })(),
+      );
+      for await (const _ of gen) {}
+    },
+  };
+})();
+await missHarness.run();
+const missEv = missHarness.emitted.find(([n, p]) => n === 'privmask/stats' && p.kind === 'restoreMiss');
+t('V5 未命中占位符只统计一次', missEv !== undefined && missEv[1].count === 1
+  && Array.isArray(missEv[1].samples) && missEv[1].samples.includes('[REDACTED_EMAIL_99]'), JSON.stringify(missEv));
 
 // X. 运行时设置：dsh-settings 命名空间注册 + live 生效（引擎重建）
 function settingsHarness(config) {
