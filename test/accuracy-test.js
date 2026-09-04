@@ -520,6 +520,10 @@ test('凭据矩阵', async () => {
   }
   const pathAt = await H.dispatch('https://example.com/a@b/c')
   if (pathAt.includes('[REDACTED_') || !pathAt.includes('a@b')) throw new Error('路径中的 @ 被误伤: ' + pathAt)
+  const cnCred = await H.dispatch('连接 admin:密码ABC123@内网主机')
+  if (cnCred.includes('密码ABC123') || !cnCred.includes('admin:[REDACTED_KEY_') || !cnCred.includes('@内网主机')) {
+    throw new Error('非 ASCII 凭据未遮罩: ' + cnCred)
+  }
 })
 
 test('PII 校验位：合法脱敏、非法放行', async () => {
@@ -750,7 +754,7 @@ test('客户端产物与 manifest 跨版本一致性', async () => {
   collect(rendered, texts, hrefs)
   const ui = texts.join(' ')
   const uiFlat = ui.replace(/\s+/g, '')
-  for (const expect of ['隐私保护：插件已启用', '插件版本：v0.2.31', '总开关', '复制更新命令', '作者：JunyuZhan', '此处为常用开关']) {
+  for (const expect of ['隐私保护：插件已启用', '插件版本：v0.2.32', '总开关', '复制更新命令', '作者：JunyuZhan', '此处为常用开关']) {
     if (!uiFlat.includes(expect)) throw new Error('卡片渲染缺少文案: ' + expect + ' => ' + ui)
   }
   if (!hrefs.includes('https://github.com/JunyuZhan/dsh-privmask')
