@@ -3,6 +3,21 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.34] - 2026-09-04
+
+### 修复（第四十一轮：userinfo 误伤面）
+
+- `mailto:user@example.com` 不再被 userinfo 规则拆成 `mailto:user:[KEY]@example.com`
+  （会残留邮箱域名）：mailto 整地址规则在 userinfo 之前全量遮罩；
+- 裸 userinfo 密码字符集排除反斜杠、起点排除冒号前导，避免 Windows 路径
+  （`C:\users\alice@example.com`）与 `mailto:/tel:` 形态被当作凭据；
+- accuracy 凭据矩阵新增 mailto 整体遮罩回归。
+
+### 验证
+
+- 真机（0.2.33）确认：用户消息按设计以占位符落盘/展示（已知限制），
+  模型回显占位符经入站还原后在界面显示原文邮箱（mailto 链接）。
+
 ## [0.2.33] - 2026-09-04
 
 ### 修复（第四十轮：0.2.32 启动卡死）

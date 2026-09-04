@@ -524,6 +524,10 @@ test('凭据矩阵', async () => {
   if (cnCred.includes('密码ABC123') || !cnCred.includes('admin:[REDACTED_KEY_') || !cnCred.includes('@内网主机')) {
     throw new Error('非 ASCII 凭据未遮罩: ' + cnCred)
   }
+  const mailtoOut = await H.dispatch('发邮件给 mailto:user@example.com 联系')
+  if (!mailtoOut.includes('[REDACTED_EMAIL_') || mailtoOut.includes('mailto:user@example.com') || mailtoOut.includes('example.com')) {
+    throw new Error('mailto 未整体遮罩: ' + mailtoOut)
+  }
 })
 
 test('PII 校验位：合法脱敏、非法放行', async () => {
@@ -754,7 +758,7 @@ test('客户端产物与 manifest 跨版本一致性', async () => {
   collect(rendered, texts, hrefs)
   const ui = texts.join(' ')
   const uiFlat = ui.replace(/\s+/g, '')
-  for (const expect of ['隐私保护：插件已启用', '插件版本：v0.2.33', '总开关', '复制更新命令', '作者：JunyuZhan', '此处为常用开关']) {
+  for (const expect of ['隐私保护：插件已启用', '插件版本：v0.2.34', '总开关', '复制更新命令', '作者：JunyuZhan', '此处为常用开关']) {
     if (!uiFlat.includes(expect)) throw new Error('卡片渲染缺少文案: ' + expect + ' => ' + ui)
   }
   if (!hrefs.includes('https://github.com/JunyuZhan/dsh-privmask')
