@@ -620,7 +620,8 @@ test('客户端产物与 manifest 跨版本一致性', async () => {
   const reg = regs.find((r) => r.id === 'dsh-privmask')
   if (!reg) throw new Error('client.js 未注册 dsh-privmask 模块')
   const reactStub = { useState: () => [undefined, () => {}], useEffect: () => {}, useRef: () => ({ current: undefined }) }
-  const jsxStub = new Proxy({}, { get: () => () => ({ __privmaskJsx: true }) })
+  const mkJsx = (type, props) => ({ __privmaskJsx: true, type, props: props || {} })
+  const jsxStub = { Fragment: Symbol('fragment'), jsx: mkJsx, jsxs: mkJsx }
   const clientMod = reg.factory((spec) => {
     if (spec === 'react') return reactStub
     if (spec === 'react/jsx-runtime') return jsxStub
@@ -676,12 +677,13 @@ test('客户端产物与 manifest 跨版本一致性', async () => {
     clientMod.apply(ctx)
     const tab = tabs['settings.plugins.tab']
     if (!tab) throw new Error('未注册 settings.plugins.tab 卡片')
-    return tab().cfg
+    const registered = tab()
+    return { cfg: registered.cfg, comp: registered.comp }
   }
 
   const cfgBase = { enabled: true, redactNames: true, redactCompanies: true, redactOrgs: true, redactAddress: true, redactCredentials: true, customTerms: ['欧阳雪'] }
   const scope = makeScope(cfgBase, 5)
-  const card = makeCtx(scope)
+  const { cfg: card, comp: cardComp } = makeCtx(scope)
   if (card.id !== 'privmask' || card.order !== 20 || card.label() !== '隐私保护') {
     throw new Error('卡片注册信息不符: ' + JSON.stringify({ id: card.id, order: card.order, label: card.label() }))
   }
@@ -702,10 +704,46 @@ test('客户端产物与 manifest 跨版本一致性', async () => {
   try { await props.update('other-ns', { enabled: true }, 6) } catch { threw = true }
   if (!threw) throw new Error('update 未拒绝未知命名空间')
   const noWriteScope = makeScope(cfgBase, 9, { noWrite: true })
-  const card2 = makeCtx(noWriteScope)
+  const { cfg: card2 } = makeCtx(noWriteScope)
   threw = false
   try { await card2.inject().update('privmask', { enabled: false }, 9) } catch { threw = true }
   if (!threw) throw new Error('写入未生效时 update 未报错')
+
+  // —— 迷你首帧渲染（无 DOM）：校验文案、版本号与署名链接 ——
+  const renderStates = {
+    enabled: true, cfg: { enabled: true, redactNames: true, redactCompanies: true, redactOrgs: true, redactAddress: true, redactCredentials: true, customTerms: [] },
+    revision: 5, writable: true, saving: null, error: null, copied: false, termInput: '', terms: [],
+  }
+  const hookOrder = ['enabled', 'cfg', 'revision', 'writable', 'saving', 'error', 'copied', 'termInput', 'terms']
+  let hookIndex = 0
+  reactStub.useState = (initial) => {
+    const key = hookOrder[hookIndex++]
+    return [key ? renderStates[key] : initial, () => {}]
+  }
+  reactStub.useEffect = () => {}
+  reactStub.useRef = () => ({ current: undefined })
+  const rendered = cardComp(card.inject())
+  function collect(node, texts, hrefs) {
+    if (node === null || node === undefined || typeof node === 'boolean') return
+    if (typeof node === 'string' || typeof node === 'number') { texts.push(String(node)); return }
+    if (Array.isArray(node)) { for (const n of node) collect(n, texts, hrefs); return }
+    if (node && node.__privmaskJsx) {
+      if (node.props.href) hrefs.push(node.props.href)
+      collect(node.props.children, texts, hrefs)
+    }
+  }
+  const texts = []
+  const hrefs = []
+  collect(rendered, texts, hrefs)
+  const ui = texts.join(' ')
+  const uiFlat = ui.replace(/\s+/g, '')
+  for (const expect of ['隐私保护：插件已启用', '插件版本：v0.2.29', '总开关', '复制更新命令', '作者：JunyuZhan', '此处为常用开关']) {
+    if (!uiFlat.includes(expect)) throw new Error('卡片渲染缺少文案: ' + expect + ' => ' + ui)
+  }
+  if (!hrefs.includes('https://github.com/JunyuZhan/dsh-privmask')
+    || !hrefs.includes('https://github.com/JunyuZhan/dsh-privmask/issues')) {
+    throw new Error('卡片署名链接缺失: ' + JSON.stringify(hrefs))
+  }
 })
 
 test('配置矩阵：全面脱敏档', async () => {
