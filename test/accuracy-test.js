@@ -744,7 +744,7 @@ test('客户端产物与 manifest 跨版本一致性', async () => {
   collect(rendered, texts, hrefs)
   const ui = texts.join(' ')
   const uiFlat = ui.replace(/\s+/g, '')
-  for (const expect of ['隐私保护：插件已启用', '插件版本：v0.2.29', '总开关', '复制更新命令', '作者：JunyuZhan', '此处为常用开关']) {
+  for (const expect of ['隐私保护：插件已启用', '插件版本：v0.2.30', '总开关', '复制更新命令', '作者：JunyuZhan', '此处为常用开关']) {
     if (!uiFlat.includes(expect)) throw new Error('卡片渲染缺少文案: ' + expect + ' => ' + ui)
   }
   if (!hrefs.includes('https://github.com/JunyuZhan/dsh-privmask')
