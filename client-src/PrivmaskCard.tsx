@@ -57,6 +57,7 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
   const [writable, setWritable] = useState(false)
   const [saving, setSaving] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
   const [termInput, setTermInput] = useState('')
   const [terms, setTerms] = useState<string[]>([])
 
@@ -169,6 +170,33 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
     void saveTerms(terms.filter((x) => x !== t))
   }
 
+  /** 复制更新命令到剪贴板（clipboard API，带 textarea 兜底） */
+  const copyUpdateCommand = () => {
+    const cmd = 'dsh plugin --profile web update dsh-privmask'
+    const done = () => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 3000)
+    }
+    const fallback = () => {
+      try {
+        const ta = document.createElement('textarea')
+        ta.value = cmd
+        document.body.appendChild(ta)
+        ta.select()
+        document.execCommand('copy')
+        document.body.removeChild(ta)
+        done()
+      } catch {
+        setError('无法复制，请手动输入：' + cmd)
+      }
+    }
+    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(cmd).then(done).catch(fallback)
+    } else {
+      fallback()
+    }
+  }
+
   /** 一行开关：状态文本（已开启/已关闭）+ 动作按钮（关闭/开启） */
   const switchRow = (key: string, label: string) => {
     const on = field(key)
@@ -248,7 +276,18 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
       <div style={body}>
         发往云端前，姓名、身份证、电话、邮箱、地址、公司/单位名称与密钥凭据会被替换为占位符；涉案金额、日期、案号保留（便于金额核算与时效判断）。本地会话日志中的用户输入与工具结果同样遮罩。
       </div>
-      <div style={body}>更新：dsh plugin --profile web update dsh-privmask，然后重启 dsh web。</div>
+      <div style={line}>
+        <span>更新：</span>
+        <button
+          type="button"
+          disabled={saving !== null}
+          style={btnBase}
+          onClick={copyUpdateCommand}
+        >
+          {copied ? '已复制 ✓' : '复制更新命令'}
+        </button>
+      </div>
+      <div style={body}>复制后在终端运行该命令，并重启 dsh web 生效。</div>
       <div style={body}>此处为常用开关；案号/出生日期/严格模式等其余选项请在配置文件中调整（$DSH_HOME/profiles/web/cordis.patch.yml）。</div>
     </div>
   )
