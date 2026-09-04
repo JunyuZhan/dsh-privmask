@@ -502,10 +502,17 @@ test('凭据矩阵', async () => {
     ['AWS', 'aws_secret_access_key=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'],
     ['Bearer', 'Authorization: Bearer abcdefghijklmnop12345678'],
     ['key=val', 'api_key=abcdef1234567890'],
+    ['url-userinfo', 'http://user:Pass_w!ord9@example.com/path'],
+    ['bare-userinfo', 'connect admin:Secret123@db.internal:5432'],
   ]
   for (const [name, text] of cases) {
     const out = await H.dispatch(text)
     if (!out.includes('[REDACTED_KEY_') && !out.includes('[REDACTED_JWT_') && !out.includes('[REDACTED_PEM_')) throw new Error(name + ' 未脱敏: ' + out.slice(0, 40))
+    if (name === 'url-userinfo' || name === 'bare-userinfo') {
+      if (out.includes('Pass_w!ord9') || out.includes('Secret123')) throw new Error(name + ' 用户信息密码泄漏')
+      const keys = (out.match(/\[REDACTED_KEY_\d+\]/g) || [])
+      if (keys.length !== 1) throw new Error(name + ' 二次包裹: ' + out)
+    }
   }
 })
 
