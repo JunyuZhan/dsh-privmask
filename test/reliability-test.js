@@ -539,6 +539,20 @@ const LTptcB = logMaskHarness({ logRedactions: false, nonTextPolicy: 'block' });
 const td12 = await LTptcB.ptcDispatch('sess-T', 'run_code', [{ type: 'image', image: 'aGVsbG8=' }]);
 t('T11 ptc-dispatch-log block-安全标记替换', td12.length === 1 && td12[0].text.includes('已拦截') && !td12[0].text.includes('aGVsbG8='), JSON.stringify(td12));
 
+// T12/T13：字符串 content（非块数组）必须走文本脱敏，绝不能逐字符当作非文本块丢弃
+const LTs = logMaskHarness({ logRedactions: false });
+const tsText = '邮箱 ' + S.email;
+const ts1 = await LTs.llm('占位', 'sess-Ts', { messages: [{ role: 'user', content: tsText }] });
+t('T12 字符串 content 出站脱敏且不丢文本', typeof ts1.messages[0].content === 'string'
+  && ts1.messages[0].content.includes('邮箱')
+  && ts1.messages[0].content.includes('[REDACTED_EMAIL_')
+  && !ts1.messages[0].content.includes(S.email), JSON.stringify(ts1.messages[0].content));
+const ts2 = await LTs.postExecute('sess-Ts', 'write_file', '工具结果 ' + S.email);
+t('T13 字符串工具结果遮罩不丢文本', ts2.kind === 'accept' && typeof ts2.content === 'string'
+  && ts2.content.includes('工具结果')
+  && ts2.content.includes('[REDACTED_EMAIL_')
+  && !ts2.content.includes(S.email), JSON.stringify(ts2.content));
+
 // U. 展示层还原：包装 sessionController.page/follow，浏览器读取时还原占位符（日志仍为占位符）
 function displayHarness(config) {
   let preStep = null;

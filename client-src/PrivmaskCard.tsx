@@ -183,9 +183,10 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
         ta.value = cmd
         document.body.appendChild(ta)
         ta.select()
-        document.execCommand('copy')
+        const ok = document.execCommand('copy')
         document.body.removeChild(ta)
-        done()
+        if (ok) done()
+        else setError('复制失败，请手动输入：' + cmd)
       } catch {
         setError('无法复制，请手动输入：' + cmd)
       }

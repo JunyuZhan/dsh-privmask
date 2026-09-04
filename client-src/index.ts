@@ -70,18 +70,24 @@ export function apply(ctx: ClientContext): void {
     const current = scope.getSnapshot()
     if (current.status === 'ready' || current.status === 'unavailable') return current
     return new Promise((resolve, reject) => {
+      let settled = false
       let off = () => {}
-      const timer = setTimeout(() => {
+      let timer: ReturnType<typeof setTimeout> | null = null
+      const finish = (ok: boolean, value: PrivmaskScopeSnapshot | Error) => {
+        if (settled) return
+        settled = true
+        if (timer !== null) clearTimeout(timer)
         off()
-        reject(new Error('settings 读取超时（settings 未挂载时保持配置文件模式）'))
-      }, 4000)
+        if (ok) resolve(value as PrivmaskScopeSnapshot)
+        else reject(value)
+      }
+      timer = setTimeout(
+        () => finish(false, new Error('settings 读取超时（settings 未挂载时保持配置文件模式）')),
+        4000,
+      )
       off = scope.subscribe(() => {
         const snap = scope.getSnapshot()
-        if (snap.status === 'ready' || snap.status === 'unavailable') {
-          clearTimeout(timer)
-          off()
-          resolve(snap)
-        }
+        if (snap.status === 'ready' || snap.status === 'unavailable') finish(true, snap)
       })
     })
   }
