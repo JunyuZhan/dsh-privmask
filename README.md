@@ -65,6 +65,22 @@ dsh plugin --profile web remove dsh-privmask
 npm install dsh-privmask
 ```
 
+### 环境与安装排查
+
+- **Node 版本**：声明 `>=18`，CI 在 Node 18/20/22 运行，本仓库同时在 Node 24 手工验证。
+- **官方包与开发线**：浏览器端同时适配官方 npm `@deepseek-ai/dsh`
+  （0.1.0-rc.6 / 0.1.1-rc.2）与 0.1.2-alpha.1 开发线；若默认 registry 是镜像源且新版本未同步，
+  更新时可显式指定官方源：`dsh plugin --profile web update dsh-privmask --registry=https://registry.npmjs.org`。
+- **“Already up to date”或安装报“最小发布期”**：pnpm 11 供应链策略会拦截刚发布（未过发布期）的版本，
+  把对应版本加入 profile 的 `pnpm-workspace.yaml` 白名单即可：
+  `minimumReleaseAgeExclude: [dsh-privmask@<版本号>]`。
+- **更新后必须重启**：`dsh plugin ... update` 只替换包文件，运行中的进程仍加载旧代码；
+  重启后访问令牌会变化（dsh web 每次启动打印新地址），后台服务（如 LaunchAgent）请用
+  `launchctl bootout/bootstrap` 重启，再打开启动日志末尾打印的带 token 地址。
+- **profile 差异**：隐私保护卡片只在 `web` profile 的“设置 → 插件”里出现；
+  headless/其它 profile 使用同一套 host 规则与配置文件（`$DSH_HOME/profiles/<name>/cordis.patch.yml`），
+  展示层还原、运行时开关等浏览器能力自动降级。
+
 ## 快速开始
 
 默认配置即「隐私优先」：密钥凭据、地址、姓名、公司/单位名称与 PII 脱敏；案号、出生日期、涉案金额保留（公开可查或办案所需）。
@@ -161,7 +177,7 @@ npm install dsh-privmask
 
 ```sh
 node test/self-test.js        # 14 项功能回归（端到端拦截 + 中文实体）
-node test/reliability-test.js # 136 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/词表热更新/字符串 content 还原/出站脱敏）
+node test/reliability-test.js # 137 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/词表热更新/字符串 content 还原/出站脱敏）
 node test/accuracy-test.js    # 26 项准确性（法律文档矩阵/凭据/PII校验/证件与信用代码上下文/复姓/泛化机构与村镇/姓名标签边界/客户端版本一致性）
 node test/fuzz-test.js        # 300 例随机文本 × 2 断言（不崩 + 幂等，共 600 断言）
 ```

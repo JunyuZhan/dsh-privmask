@@ -7,6 +7,9 @@
 
 ### 修复（第三十八轮：代码审查整改）
 
+- **请求形态守卫与 __proto__ 字段安全**：`messages` 缺失/非数组时给出明确拒绝（不再裸 TypeError）；
+  对象拷贝改用 `defineProperty` 写入，避免字段名为 `__proto__` 时触发原型 setter 导致字段丢失/污染。
+  新增 T16 回归（可靠性 136 → 137）
 - **超长无空白 ASCII 连续串守卫**：约 8MB 单 token 会让 V8 正则栈溢出（RangeError）；
   引擎现对 >4MB 的连续无空白 ASCII 运行直接给出明确拒绝，accuracy 性能测试覆盖
 - **恢复流收尾冲刷**：流在没有 block-end 时结束且尾部残留疑似占位符前缀，
@@ -34,6 +37,8 @@
 
 ### 文档
 
+- README 新增「环境与安装排查」：镜像源滞后、pnpm 最小发布期白名单、重启与令牌、
+  LaunchAgent/后台环境、非 web profile 的能力降级
 - README 新增「诊断与统计」章节（控制台前缀、privmask/stats 事件、还原未命中格式、诊断文件）
 - package.json 清理：合并重复的 `keywords` 键（此前存在两份，解析器只保留后者）
 - README 已知限制补充内存上界说明（200 会话上限、极端规模内存可能较大）

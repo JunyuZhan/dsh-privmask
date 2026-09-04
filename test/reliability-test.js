@@ -1,6 +1,7 @@
 import test from 'node:test';
 // dsh-privmask 可靠性测试（数据全部码点/碎片构造，源码无敏感字面）
 import { apply } from '../lib/index.js';
+import { createEngine } from '../lib/engine.js';
 import { restoreJson } from '../lib/restore.js';
 test('dsh-privmask reliability', async () => {
 
@@ -568,6 +569,19 @@ const ts4 = restoreJson(
 );
 t('T15 restoreJson 结构化还原', ts4.q.includes(S.email) && !ts4.q.includes('REDACTED')
   && ts4.arr[0] === S.email && ts4.deep.q === S.email && ts4.n === 1, JSON.stringify(ts4));
+let guardErr = '';
+try { createEngine({}).sanitizeRequest({ provider: 't' }) } catch (e) { guardErr = String(e && e.message ? e.message : e) }
+const protoArgs = {};
+Object.defineProperty(protoArgs, '__proto__', { value: '邮箱 ' + S.email, enumerable: true, writable: true, configurable: true });
+const ts5 = await LTs.llm('占位', 'sess-Ts', {
+  messages: [{ role: 'assistant', content: [{ type: 'tool-call', id: 'c2', name: 'proto', arguments: protoArgs }] }],
+});
+const ts5a = ts5.messages[0].content[0].arguments;
+t('T16 防御：messages 形态守卫与 __proto__ 字段安全', /messages/.test(guardErr)
+  && Object.prototype.hasOwnProperty.call(ts5a, '__proto__')
+  && ts5a['__proto__'].includes('[REDACTED_EMAIL_')
+  && !ts5a['__proto__'].includes(S.email)
+  && Object.getPrototypeOf(ts5a) === Object.prototype, JSON.stringify({ guardErr, args: ts5a }));
 
 // U. 展示层还原：包装 sessionController.page/follow，浏览器读取时还原占位符（日志仍为占位符）
 function displayHarness(config) {
