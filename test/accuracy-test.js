@@ -653,6 +653,11 @@ test('性能阈值', async () => {
   await H.dispatch(big)
   const cost = Date.now() - t0
   if (cost > 1000) throw new Error('150KB 超时: ' + cost + 'ms')
+  // 防灾难回溯回归：长串无分隔符字母数字曾让邮箱正则 O(n²)（200KB ≈ 18s）
+  const tAd = Date.now()
+  await H.dispatch('a1B2'.repeat(50000))
+  const costAd = Date.now() - tAd
+  if (costAd > 1000) throw new Error('200KB 字母数字灾难回溯: ' + costAd + 'ms')
   const t1 = Date.now()
   await H.dispatch('普通法律文书文本没有敏感信息的重复填充。'.repeat(4000))
   const cost2 = Date.now() - t1

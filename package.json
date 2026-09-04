@@ -3,17 +3,7 @@
  "description": "DeepSeek Harness 本地脱敏插件：在 llm/stream 出口拦截发往云端大模型的请求，将密钥、PII、中文实体（姓名/身份证/公司/机关/地址等）替换为占位符后再发送；用户输入与工具结果在写入本地会话日志前同样遮罩，模型回复经入站还原以原值落盘与显示。",
  "version": "0.2.29",
  "author": "JunyuZhan",
- "keywords": [
-  "privacy",
-  "redaction",
-  "pii",
-  "dsh",
-  "deepseek",
-  "plugin",
-  "脱敏",
-  "隐私保护"
- ],
-  "type": "module",
+ "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
   "engines": {
@@ -64,6 +54,11 @@
     "@deepseek-ai/schemastery": "^3.18.1"
   },
   "keywords": [
+    "pii",
+    "dsh",
+    "plugin",
+    "脱敏",
+    "隐私保护",
     "deepseek-harness",
     "cordis",
     "privacy",
