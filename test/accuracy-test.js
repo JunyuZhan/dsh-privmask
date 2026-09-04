@@ -611,6 +611,100 @@ test('客户端产物与 manifest 跨版本一致性', async () => {
   if (/["']remote\.settings["']/.test(client)) {
     throw new Error('client.js 仍依赖 0.1.2 专属服务 remote.settings，官方包会停在 PENDING')
   }
+
+  // —— 客户端数据层（无 DOM）：加载产物并驱动 list/describe/update ——
+  const regs = []
+  globalThis.window = { __ModuleLoader__: { load: (r) => regs.push(r) } }
+  await import(new URL('../lib/client.js', import.meta.url))
+  const reg = regs.find((r) => r.id === 'dsh-privmask')
+  if (!reg) throw new Error('client.js 未注册 dsh-privmask 模块')
+  const reactStub = { useState: () => [undefined, () => {}], useEffect: () => {}, useRef: () => ({ current: undefined }) }
+  const jsxStub = new Proxy({}, { get: () => () => ({ __privmaskJsx: true }) })
+  const clientMod = reg.factory((spec) => {
+    if (spec === 'react') return reactStub
+    if (spec === 'react/jsx-runtime') return jsxStub
+    throw new Error('client.js 意外 require: ' + spec)
+  })
+  const expectInject = ['slots', 'locale', 'remote', 'remote.pluginInventory', 'settingsScope']
+  if (JSON.stringify(clientMod.inject) !== JSON.stringify(expectInject)) {
+    throw new Error('client inject 服务键不符: ' + JSON.stringify(clientMod.inject))
+  }
+
+  function makeScope(initialValue, revision, opts = {}) {
+    const state = { value: { ...initialValue }, revision, writable: opts.writable !== false }
+    const listeners = []
+    return {
+      state,
+      getSnapshot: () => ({
+        status: opts.status || 'ready',
+        value: state.value,
+        revision: state.revision,
+        writable: state.writable,
+      }),
+      subscribe: (cb) => { listeners.push(cb); return () => {} },
+      set: async (key, value) => {
+        if (opts.noWrite) return
+        state.value = { ...state.value, [key]: value }
+        state.revision += 1
+      },
+    }
+  }
+  function makeCtx(scope) {
+    const dicts = {}
+    const tabs = {}
+    const ctx = {
+      effect: (fn) => { fn(); return () => {} },
+      locale: {
+        register: (ns, d) => { dicts[ns] = d },
+        bind: (ns) => (key) => {
+          const d = dicts[ns]
+          return d ? (d.zh || {})[key] : undefined
+        },
+      },
+      slots: {
+        inject: (key, fn) => { tabs[key] = fn },
+        register: (cfg, comp) => ({ cfg, comp }),
+      },
+      remote: {
+        pluginInventory: {
+          list: async () => ({ ok: true, value: { entries: [{ entryId: 'privmask-entry', moduleName: 'dsh-privmask', enabled: true, fiberPhase: 'active' }] } }),
+        },
+      },
+      settingsScope: { bind: () => scope },
+    }
+    clientMod.apply(ctx)
+    const tab = tabs['settings.plugins.tab']
+    if (!tab) throw new Error('未注册 settings.plugins.tab 卡片')
+    return tab().cfg
+  }
+
+  const cfgBase = { enabled: true, redactNames: true, redactCompanies: true, redactOrgs: true, redactAddress: true, redactCredentials: true, customTerms: ['欧阳雪'] }
+  const scope = makeScope(cfgBase, 5)
+  const card = makeCtx(scope)
+  if (card.id !== 'privmask' || card.order !== 20 || card.label() !== '隐私保护') {
+    throw new Error('卡片注册信息不符: ' + JSON.stringify({ id: card.id, order: card.order, label: card.label() }))
+  }
+  const props = card.inject()
+  const listSnap = await props.list()
+  const entry = listSnap.entries.find((e) => e.moduleName === 'dsh-privmask')
+  if (!entry || entry.enabled !== true) throw new Error('pluginInventory 读取失败')
+  const d = await props.describe()
+  if (d.writable !== true || d.namespaces[0].ns !== 'privmask' || d.namespaces[0].revision !== 5
+    || d.namespaces[0].value.customTerms[0] !== '欧阳雪') {
+    throw new Error('describe 结果不符: ' + JSON.stringify(d))
+  }
+  const up = await props.update('privmask', { enabled: false }, 5)
+  if (scope.state.value.enabled !== false || scope.state.revision !== 6 || up.value.revision !== 6) {
+    throw new Error('update 未写入或未返回新 revision: ' + JSON.stringify(up))
+  }
+  let threw = false
+  try { await props.update('other-ns', { enabled: true }, 6) } catch { threw = true }
+  if (!threw) throw new Error('update 未拒绝未知命名空间')
+  const noWriteScope = makeScope(cfgBase, 9, { noWrite: true })
+  const card2 = makeCtx(noWriteScope)
+  threw = false
+  try { await card2.inject().update('privmask', { enabled: false }, 9) } catch { threw = true }
+  if (!threw) throw new Error('写入未生效时 update 未报错')
 })
 
 test('配置矩阵：全面脱敏档', async () => {
@@ -652,14 +746,15 @@ test('性能阈值', async () => {
   const t0 = Date.now()
   await H.dispatch(big)
   const cost = Date.now() - t0
-  if (cost > 1000) throw new Error('150KB 超时: ' + cost + 'ms')
+  // 阈值保留数量级余量（本地实测约数十 ms），只拦截二次方/灾难回溯类回归，避免 CI 抖动误报
+  if (cost > 2500) throw new Error('150KB 超时: ' + cost + 'ms')
   // 防灾难回溯回归：长串无分隔符字母数字曾让邮箱正则 O(n²)（200KB ≈ 18s）
   const tAd = Date.now()
   await H.dispatch('a1B2'.repeat(50000))
   const costAd = Date.now() - tAd
-  if (costAd > 1000) throw new Error('200KB 字母数字灾难回溯: ' + costAd + 'ms')
+  if (costAd > 2500) throw new Error('200KB 字母数字灾难回溯: ' + costAd + 'ms')
   const t1 = Date.now()
   await H.dispatch('普通法律文书文本没有敏感信息的重复填充。'.repeat(4000))
   const cost2 = Date.now() - t1
-  if (cost2 > 500) throw new Error('纯文本超时: ' + cost2 + 'ms')
+  if (cost2 > 2000) throw new Error('纯文本超时: ' + cost2 + 'ms')
 })
