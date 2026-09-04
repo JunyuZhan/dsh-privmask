@@ -3,6 +3,33 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.27] - 2026-09-04
+
+### 修复（第三十六轮：跨版本兼容官方包）
+
+- **修复官方 npm 包安装后插件依赖缺失**：官方 dsh（npm 最新 0.1.1-rc.2，含 npx 缓存中的 0.1.0-rc.6）
+  的网页端模块表没有 `@deepseek-ai/dsh-api-settings-controller`（0.1.2-alpha.1 才引入），
+  此前 `dsh.client.inject` 声明了对它的依赖，用户安装后在启动/插件列表看到「依赖缺失/等待依赖」类提示。
+  已移除该声明；现在只声明官方 0.1.0-rc.6、0.1.1-rc.2 与 0.1.2-alpha.1 模块表都有的行
+  （client-connection / client-runtime / api-remotes / client-ui-settings / client-locale）。
+- **浏览器端改用跨版本共有的 `settingsScope` 服务**：卡片原先使用 0.1.2 才提供的
+  `remote.settings` 读写命名空间，旧官方包没有该服务会导致客户端停在 PENDING（表现为「等待依赖」）。
+  现改为两线（官方 0.1.0-rc.6+ 与 0.1.2 开发线）都由 `dsh-client-ui-settings` 提供的
+  `settingsScope.bind({ namespace: 'privmask' })` 作用域读写，启停状态、全面脱敏档、地址/凭据开关、
+  自定义敏感词编辑等功能全部保留；读写失败/版本冲突仍以可见错误提示。
+- 运行 `dsh web` 的浏览器端不再因官方包版本偏旧而加载失败；host 端出站脱敏主链路不受影响。
+
+### 兼容性说明
+
+- 官方 npm `@deepseek-ai/dsh`（0.1.0-rc.6 / 0.1.1-rc.2）：完整可用（核心脱敏、日志遮罩、卡片开关）。
+- 本地 0.1.2-alpha.1 开发线：完整可用；`tools/ptc-dispatch-log`（run_code 子派发日志遮罩）
+  仅在 dsh ≥ 0.1.2 提供该事件的宿主上自动启用，旧官方版无此事件属宿主能力差异，不视为插件功能缺失。
+
+### 测试
+
+- accuracy-test 新增 客户端 manifest 不依赖 0.1.2 专属模块 回归（防止未来误加回
+  `@deepseek-ai/dsh-api-settings-controller` 依赖）
+
 ## [0.2.26] - 2026-08-30
 
 ### 修复（第三十五轮：卡片版本号）

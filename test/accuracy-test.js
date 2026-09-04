@@ -581,12 +581,35 @@ test('复姓：司马/诸葛/上官/慕容等完整识别', async () => {
   if (!main.includes('[REDACTED_NAME_') || !main.includes('民间借贷')) throw new Error('复姓判决主文异常: ' + main)
 })
 
-test('客户端卡片版本号与 package.json 一致', async () => {
+test('客户端产物与 manifest 跨版本一致性', async () => {
   const fs = await import('node:fs')
   const client = fs.readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8')
   const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
   if (!client.includes('PLUGIN_VERSION = "' + pkg.version + '"')) {
     throw new Error('client.js 版本号与 package.json 不一致: package=' + pkg.version)
+  }
+  const inject = pkg.dsh?.client?.inject
+  if (!Array.isArray(inject) || inject.length === 0) {
+    throw new Error('package.json 缺少 dsh.client.inject 声明')
+  }
+  // 0.1.2-alpha.1 才引入、官方 npm 0.1.0-rc.6/0.1.1-rc.2 网页模块表没有的行，
+  // 一旦加回即破坏官方包加载（表现为依赖缺失/等待依赖）
+  const devOnly = ['@deepseek-ai/dsh-api-settings-controller', '@deepseek-ai/dsh-client-ui-slots']
+  const bad = inject.filter((name) => devOnly.includes(name))
+  if (bad.length > 0) {
+    throw new Error('manifest 含 0.1.2 专属客户端依赖，官方包无法加载: ' + bad.join(', '))
+  }
+  const common = ['@deepseek-ai/dsh-client-connection', '@deepseek-ai/dsh-client-runtime',
+    '@deepseek-ai/dsh-api-remotes', '@deepseek-ai/dsh-client-ui-settings', '@deepseek-ai/dsh-client-locale']
+  const missing = common.filter((name) => !inject.includes(name))
+  if (missing.length > 0) {
+    throw new Error('manifest 缺少跨版本公共客户端依赖: ' + missing.join(', '))
+  }
+  if (!client.includes('"settingsScope"')) {
+    throw new Error('client.js 未使用跨版本 settingsScope 服务（仍依赖 remote.settings?）')
+  }
+  if (/["']remote\.settings["']/.test(client)) {
+    throw new Error('client.js 仍依赖 0.1.2 专属服务 remote.settings，官方包会停在 PENDING')
   }
 })
 

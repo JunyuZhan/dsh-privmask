@@ -8,11 +8,11 @@ export interface PrivmaskCardInjected {
   }>
   describe: () => Promise<{
     writable: boolean
-    namespaces: Array<{ ns: string; value: Record<string, unknown>; revision: number }>
+    namespaces: Array<{ ns: string; value: Record<string, unknown>; revision?: number }>
   }>
   /** 按字段写回（内部转成官方 mutate 操作），返回写入后的解析值 */
   update: (ns: string, patch: Record<string, unknown>, rev?: number) => Promise<{
-    value?: { value: Record<string, unknown>; revision: number }
+    value?: { value: Record<string, unknown>; revision?: number }
   }>
 }
 

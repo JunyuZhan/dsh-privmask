@@ -53,6 +53,12 @@ dsh plugin --profile web update dsh-privmask
 dsh plugin --profile web remove dsh-privmask
 ```
 
+> **兼容性**：0.2.27 起浏览器端同时适配官方 npm 包
+> （`@deepseek-ai/dsh` 0.1.0-rc.6 / 0.1.1-rc.2，即 `npx @deepseek-ai/dsh web` 安装的版本）
+> 与 0.1.2-alpha.1 开发线。run_code 子派发日志遮罩仅在宿主提供
+> `tools/ptc-dispatch-log`（dsh ≥ 0.1.2）时自动启用，旧官方版无此事件属宿主能力差异，
+> 核心出站脱敏与卡片开关在两线上均可用。
+
 ### 通过 npm
 
 ```sh
