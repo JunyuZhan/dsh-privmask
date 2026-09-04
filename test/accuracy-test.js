@@ -514,6 +514,12 @@ test('凭据矩阵', async () => {
       if (keys.length !== 1) throw new Error(name + ' 二次包裹: ' + out)
     }
   }
+  const multiAt = await H.dispatch('http://u:p@ss_w!ordX9@example.com/x')
+  if (multiAt.includes('p@ss_w!ordX9') || !multiAt.includes('http://u:[REDACTED_KEY_') || !multiAt.includes('@example.com/x')) {
+    throw new Error('多 @ 用户信息未整段遮罩: ' + multiAt)
+  }
+  const pathAt = await H.dispatch('https://example.com/a@b/c')
+  if (pathAt.includes('[REDACTED_') || !pathAt.includes('a@b')) throw new Error('路径中的 @ 被误伤: ' + pathAt)
 })
 
 test('PII 校验位：合法脱敏、非法放行', async () => {
