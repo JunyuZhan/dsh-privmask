@@ -108,6 +108,11 @@ test('误伤防回归', async () => {
     ['街道口（泛指）', '我去街道口买苹果。'],
     ['在小区门口（泛指）', '在小区门口等我。'],
     ['家门口的路（泛指）', '家门口的路不好走。'],
+    ['十字路口（泛指）', '注意十字路口红绿灯。'],
+    ['三岔路口（泛指）', '三岔路口有家便利店。'],
+    ['前方路口（泛指）', '前方路口左转。'],
+    ['新开了一家律师事务所（泛指）', '新开了一家律师事务所。'],
+    ['一家公司（泛指）', '一家公司叫张三科技。'],
   ]
   for (const [name, text] of cases) {
     const out = await H.dispatch(text)
@@ -764,7 +769,7 @@ test('客户端产物与 manifest 跨版本一致性', async () => {
   collect(rendered, texts, hrefs)
   const ui = texts.join(' ')
   const uiFlat = ui.replace(/\s+/g, '')
-  for (const expect of ['隐私保护：插件已启用', '插件版本：v0.2.36', '总开关', '复制更新命令', '作者：JunyuZhan', '此处为常用开关']) {
+  for (const expect of ['隐私保护：插件已启用', '插件版本：v0.2.37', '总开关', '复制更新命令', '作者：JunyuZhan', '此处为常用开关']) {
     if (!uiFlat.includes(expect)) throw new Error('卡片渲染缺少文案: ' + expect + ' => ' + ui)
   }
   if (!hrefs.includes('https://github.com/JunyuZhan/dsh-privmask')
