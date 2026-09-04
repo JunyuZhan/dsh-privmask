@@ -3,6 +3,17 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.31] - 2026-09-04
+
+### 文档（第三十九轮：真实环境回归）
+
+- 真实环境回归确认：部分 dsh 组合下插件 host 上下文探测不到 `sessionController`
+  （注册在 web-app 内层 include），展示层还原不生效，用户消息在界面与日志中一致为占位符。
+  已在 README「已知限制」与机制条目如实记录该场景及启动日志告警字样。
+- 浏览器端替代方案调研结论：聊天显示走 `uiConversation`/`remote.session`，包装可行，
+  但浏览器拿不到 host 内存中的占位符映射，需新增 host→browser 的映射 RPC（新架构缝），
+  暂不自行实现，建议向 dsh 官方申请会话读取/改写缝。
+
 ## [0.2.30] - 2026-09-04
 
 ### 修复（第三十九轮：URL 凭据盲区）
