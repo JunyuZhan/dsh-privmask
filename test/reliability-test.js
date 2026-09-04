@@ -1,6 +1,7 @@
 import test from 'node:test';
 // dsh-privmask 可靠性测试（数据全部码点/碎片构造，源码无敏感字面）
 import { apply } from '../lib/index.js';
+import { restoreJson } from '../lib/restore.js';
 test('dsh-privmask reliability', async () => {
 
 const cn = (...cps) => String.fromCharCode(...cps);
@@ -552,6 +553,21 @@ t('T13 字符串工具结果遮罩不丢文本', ts2.kind === 'accept' && typeof
   && ts2.content.includes('工具结果')
   && ts2.content.includes('[REDACTED_EMAIL_')
   && !ts2.content.includes(S.email), JSON.stringify(ts2.content));
+const tsArgs = { query: '邮箱 ' + S.email, filters: { page: 1 }, tags: ['内部 ' + S.email] };
+const ts3 = await LTs.llm('占位', 'sess-Ts', {
+  messages: [{ role: 'assistant', content: [{ type: 'tool-call', id: 'c1', name: 'lookup', arguments: tsArgs }] }],
+});
+const ts3b = ts3.messages[0].content[0];
+t('T14 结构化工具参数递归遮罩', ts3b.type === 'tool-call' && typeof ts3b.arguments === 'object'
+  && ts3b.arguments.query.includes('[REDACTED_EMAIL_') && !ts3b.arguments.query.includes(S.email)
+  && ts3b.arguments.tags[0].includes('[REDACTED_EMAIL_') && !ts3b.arguments.tags[0].includes(S.email)
+  && ts3b.arguments.filters.page === 1, JSON.stringify(ts3b.arguments));
+const ts4 = restoreJson(
+  { q: '邮箱 [REDACTED_EMAIL_1]', arr: ['[REDACTED_EMAIL_1]'], n: 1, deep: { q: '[REDACTED_EMAIL_1]' } },
+  [['[REDACTED_EMAIL_1]', S.email]],
+);
+t('T15 restoreJson 结构化还原', ts4.q.includes(S.email) && !ts4.q.includes('REDACTED')
+  && ts4.arr[0] === S.email && ts4.deep.q === S.email && ts4.n === 1, JSON.stringify(ts4));
 
 // U. 展示层还原：包装 sessionController.page/follow，浏览器读取时还原占位符（日志仍为占位符）
 function displayHarness(config) {
