@@ -106,6 +106,8 @@ test('误伤防回归', async () => {
     ['全村（泛指）', '全村都参加了大会。'],
     ['工业园区（泛指）', '去工业园区招商。'],
     ['街道口（泛指）', '我去街道口买苹果。'],
+    ['在小区门口（泛指）', '在小区门口等我。'],
+    ['家门口的路（泛指）', '家门口的路不好走。'],
   ]
   for (const [name, text] of cases) {
     const out = await H.dispatch(text)
@@ -307,6 +309,10 @@ test('地址链与多姓名：脱敏覆盖与误伤回归', async () => {
   for (const [name, text, ph] of mustMask) {
     const out = await H.dispatch(text)
     if (!out.includes(ph)) throw new Error(name + ' 未脱敏: ' + out)
+  }
+  const chainRoad = await H.dispatch('位于深圳市南山区粤海街道科技园路12号')
+  if (!chainRoad.includes('[REDACTED_ADDRCHAIN_') || !chainRoad.includes('[REDACTED_STREET_') || chainRoad.includes('科技园路')) {
+    throw new Error('地址链后道路漏遮罩: ' + chainRoad)
   }
   const mustKeep = [
     ['机构名+路（非地址链）', '中国人民银行深圳市分行南山路'],
@@ -758,7 +764,7 @@ test('客户端产物与 manifest 跨版本一致性', async () => {
   collect(rendered, texts, hrefs)
   const ui = texts.join(' ')
   const uiFlat = ui.replace(/\s+/g, '')
-  for (const expect of ['隐私保护：插件已启用', '插件版本：v0.2.35', '总开关', '复制更新命令', '作者：JunyuZhan', '此处为常用开关']) {
+  for (const expect of ['隐私保护：插件已启用', '插件版本：v0.2.36', '总开关', '复制更新命令', '作者：JunyuZhan', '此处为常用开关']) {
     if (!uiFlat.includes(expect)) throw new Error('卡片渲染缺少文案: ' + expect + ' => ' + ui)
   }
   if (!hrefs.includes('https://github.com/JunyuZhan/dsh-privmask')
