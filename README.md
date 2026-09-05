@@ -246,6 +246,9 @@ CI（GitHub Actions，Node 18/20/22）在每次 push / PR 时自动运行全部�
   sessionId、未命中数量与最多 3 个占位符样例，便于判断是否因会话超长逐出导致。
 - **诊断文件**：启动与还原关键路径另写一份 `$DSH_HOME/privmask-restore.log`（默认 `~/.dsh/`），
   用于在无控制台可读的真实环境（如 LaunchAgent）排查入站还原问题。
+- **适配检查**：插件启动时会打印一行 `[privmask] 适配检查: ...`，
+  明确列出 llm/settings/模块表条目/sessionController 可见性与降级项；
+  升级宿主后先看这一行，能立刻判断哪些能力降级了。
 
 ## 脱敏对照工具
 
