@@ -113,6 +113,17 @@ test('误伤防回归', async () => {
     ['前方路口（泛指）', '前方路口左转。'],
     ['新开了一家律师事务所（泛指）', '新开了一家律师事务所。'],
     ['一家公司（泛指）', '一家公司叫张三科技。'],
+    ['前方路口施工（泛指）', '前方路口施工中。'],
+    ['丁字路口（泛指）', '丁字路口要减速。'],
+    ['附近有家医院（泛指）', '附近有家医院。'],
+    ['这家银行（泛指）', '这家银行可以办卡。'],
+    ['那家公司（泛指）', '那家公司上市了。'],
+    ['社区服务中心（泛指）', '社区服务中心搬迁。'],
+    ['楼下便利店（泛指）', '楼下便利店营业到十点。'],
+    ['村里小路（泛指）', '村里小路修好了。'],
+    ['镇上中学（泛指）', '镇上中学开学。'],
+    ['写字楼大堂（泛指）', '写字楼大堂等电梯。'],
+    ['电梯维修（泛指）', '电梯在维修中。'],
   ]
   for (const [name, text] of cases) {
     const out = await H.dispatch(text)
@@ -621,6 +632,10 @@ test('客户端产物与 manifest 跨版本一致性', async () => {
   if (!client.includes('PLUGIN_VERSION = "' + pkg.version + '"')) {
     throw new Error('client.js 版本号与 package.json 不一致: package=' + pkg.version)
   }
+  const clientSrc = fs.readFileSync(new URL('../client-src/PrivmaskCard.tsx', import.meta.url), 'utf8')
+  if (!clientSrc.includes("PLUGIN_VERSION = '" + pkg.version + "'")) {
+    throw new Error('client-src 版本号与 package.json 不一致: package=' + pkg.version)
+  }
   const inject = pkg.dsh?.client?.inject
   if (!Array.isArray(inject) || inject.length === 0) {
     throw new Error('package.json 缺少 dsh.client.inject 声明')
@@ -744,9 +759,9 @@ test('客户端产物与 manifest 跨版本一致性', async () => {
   // —— 迷你首帧渲染（无 DOM）：校验文案、版本号与署名链接 ——
   const renderStates = {
     enabled: true, cfg: { enabled: true, redactNames: true, redactCompanies: true, redactOrgs: true, redactAddress: true, redactCredentials: true, customTerms: [] },
-    revision: 5, writable: true, saving: null, error: null, copied: false, termInput: '', terms: [],
+    revision: 5, writable: true, saving: null, error: null, copied: false, copiedStatus: false, termInput: '', terms: [],
   }
-  const hookOrder = ['enabled', 'cfg', 'revision', 'writable', 'saving', 'error', 'copied', 'termInput', 'terms']
+  const hookOrder = ['enabled', 'cfg', 'revision', 'writable', 'saving', 'error', 'copied', 'copiedStatus', 'termInput', 'terms']
   let hookIndex = 0
   reactStub.useState = (initial) => {
     const key = hookOrder[hookIndex++]
@@ -769,7 +784,7 @@ test('客户端产物与 manifest 跨版本一致性', async () => {
   collect(rendered, texts, hrefs)
   const ui = texts.join(' ')
   const uiFlat = ui.replace(/\s+/g, '')
-  for (const expect of ['隐私保护：插件已启用', '插件版本：v0.2.41', '总开关', '复制更新命令', '作者：JunyuZhan', '此处为常用开关', 'dsh 0.1.0-rc.6+', '启发式本地处理']) {
+  for (const expect of ['隐私保护：插件已启用', '插件版本：v0.2.41', '总开关', '复制更新命令', '复制状态', '当前生效', '作者：JunyuZhan', '此处为常用开关', 'dsh 0.1.0-rc.6+', '启发式本地处理']) {
     if (!uiFlat.includes(expect.replace(/\s+/g, ''))) throw new Error('卡片渲染缺少文案: ' + expect + ' => ' + ui)
   }
   if (!hrefs.includes('https://github.com/JunyuZhan/dsh-privmask')

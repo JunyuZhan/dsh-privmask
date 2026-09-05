@@ -54,6 +54,8 @@ const linkStyle: React.CSSProperties = { color: 'inherit' }
 export const DSH_SUPPORT = 'dsh 0.1.0-rc.6+（官方 npm）与 0.1.2 开发线'
 /** 简版责任声明（完整版见 README「责任与边界」） */
 export const DISCLAIMER = '脱敏为启发式本地处理，无法保证零漏检；重要数据请自行评估并保留原文。'
+/** 插件版本（与 package.json 同步；accuracy 测试强制一致，避免发版漂移） */
+export const PLUGIN_VERSION = '0.2.41'
 
 export function PrivmaskCard(props: PrivmaskCardInjected) {
   const [enabled, setEnabled] = useState<boolean | null>(null)
@@ -63,6 +65,7 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
   const [saving, setSaving] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [copiedStatus, setCopiedStatus] = useState(false)
   const [termInput, setTermInput] = useState('')
   const [terms, setTerms] = useState<string[]>([])
 
@@ -203,6 +206,32 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
     }
   }
 
+  /** 复制当前生效配置摘要（供审计/截图留档） */
+  const copyStatusCommand = () => {
+    const text = statusText()
+    const done = () => {
+      setCopiedStatus(true)
+      setTimeout(() => setCopiedStatus(false), 3000)
+    }
+    const fallback = () => {
+      try {
+        const ta = document.createElement('textarea')
+        ta.value = text
+        document.body.appendChild(ta)
+        ta.select()
+        const ok = document.execCommand('copy')
+        document.body.removeChild(ta)
+        if (ok) done()
+        else setError('复制失败，请重试')
+      } catch {
+        setError('复制失败，请重试')
+      }
+    }
+    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(fallback)
+    } else fallback()
+  }
+
   /** 一行开关：状态文本（已开启/已关闭）+ 动作按钮（关闭/开启） */
   const switchRow = (key: string, label: string) => {
     const on = field(key)
@@ -224,9 +253,24 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
   // 顶部展示的是“插件装载状态”，与下方配置项“总开关（已开启/已关闭）”语义不同，
   // 用“已启用/未启用”措辞区分，避免关闭总开关后顶部仍显示“已开启”的困惑。
   const label = enabled === true ? '插件已启用' : enabled === false ? '插件未启用' : '插件状态未知'
+  const active = [
+    field('redactNames') ? '姓名' : '',
+    field('redactCompanies') ? '公司' : '',
+    field('redactOrgs') ? '机关' : '',
+    field('redactAddress') ? '地址' : '',
+    field('redactCredentials') ? '密钥凭据' : '',
+  ].filter(Boolean)
+  const kept = [
+    !field('redactCaseNumbers') ? '案号' : '',
+    !field('redactDob') ? '出生日期' : '',
+    !field('redactPaths') ? '文件路径' : '',
+  ].filter(Boolean)
+  const statusText = () =>
+    'dsh-privmask v' + PLUGIN_VERSION + ' · 生效脱敏：' + (active.join('、') || '无') + '；保留：' + (kept.join('、') || '无')
   return (
     <div style={row}>
       <div style={title}>隐私保护：{label}</div>
+      <div style={{ fontSize: 12, color: 'var(--dsh-text-2, #888)' }}>插件版本：v{PLUGIN_VERSION}</div>
       {writable && cfg !== null ? (
         <>
           {switchRow('enabled', '总开关')}
@@ -243,6 +287,7 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
           </div>
           {switchRow('redactAddress', '地址')}
           {switchRow('redactCredentials', '密钥凭据')}
+          <div style={body}>当前生效：{active.join('、') || '无'}；保留：{kept.join('、') || '无'}。</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={{ fontSize: 13 }}>自定义敏感词（当事人姓名/别名/机构简称）：</span>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -281,6 +326,12 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
       )}
       <div style={body}>
         发往云端前，姓名、身份证、电话、邮箱、地址、公司/单位名称与密钥凭据会被替换为占位符；涉案金额、日期、案号保留（便于金额核算与时效判断）。本地会话日志中的用户输入与工具结果同样遮罩。
+      </div>
+      <div style={line}>
+        <span>状态：</span>
+        <button type="button" style={btnBase} onClick={copyStatusCommand}>
+          {copiedStatus ? '已复制 ✓' : '复制状态'}
+        </button>
       </div>
       <div style={line}>
         <span>更新：</span>

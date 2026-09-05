@@ -90,6 +90,7 @@ node tools/redact-docx.mjs input.docx                # 生成 input.redacted.doc
 node tools/redact-docx.mjs input.docx output.docx    # 指定输出路径
 node tools/redact-docx.mjs input.docx --whole-paragraph  # 按整段合并识别跨 run 敏感值
 node tools/redact-docx.mjs input.docx --config cfg.json   # 按任务配置脱敏类别（键同 README 配置表）
+node tools/redact-docx.mjs a.docx b.docx --out-dir out --report report.json  # 批量 + 报告
 ```
 
 占位符编号在整个文档中单调递增。默认按 Word 文本节点（`<w:t>`）处理；
