@@ -289,6 +289,35 @@ const Hlen = imageHarness({ preflightBase64: true, nonTextPolicy: 'block' });
 const rp7 = await Hlen.run([{ type: 'file', name: 'big.bin', content: Buffer.alloc(8 * 1024 * 1024).toString('base64') }]);
 t('M13 超长base64不可判定-block 拦截不崩', rp7.received === null && rp7.reason.kind === 'error', JSON.stringify(rp7.reason).slice(0, 120));
 
+// M14-M21 base64 预检对抗边界：白名单、大小写/空白变体、伪 base64、深度与超大元数据
+const Hpres = imageHarness({ preflightBase64: true, preserveValues: ['test123@qq.com'] });
+const rp14 = await Hpres.run([{ type: 'file', name: 'n.txt', content: mTextB64 }]);
+const dp14 = decodeOut(rp14.received && rp14.received.messages[0].content);
+t('M14 解码脱敏尊重白名单', rp14.received !== null && dp14.includes('test123@qq.com') && dp14.includes('[REDACTED_NAME_') && !dp14.includes('张三'), dp14.slice(0, 90));
+const rp15 = await Hp.run([{ type: 'file', name: 'n.txt', content: 'data:TEXT/PLAIN;BASE64,' + mTextB64 }]);
+const c15 = rp15.received && rp15.received.messages[0].content[0];
+const dp15 = c15 && typeof c15.content === 'string' && c15.content.startsWith('data:TEXT/PLAIN;BASE64,') ? Buffer.from(c15.content.slice(c15.content.indexOf(',') + 1), 'base64').toString('utf8') : '';
+t('M15 大写 dataURL 前缀保留且内容脱敏', c15 !== null && dp15.includes('[REDACTED_NAME_') && !dp15.includes('张三'), dp15.slice(0, 90));
+const spacedB64 = mTextB64.replace(/(.{20})/g, '$1\n  ');
+const rp16 = await Hp.run([{ type: 'file', name: 'n.txt', content: spacedB64 }]);
+const dp16 = decodeOut(rp16.received && rp16.received.messages[0].content);
+t('M16 换行空白 base64 可判定并脱敏', rp16.received !== null && dp16.includes('[REDACTED_EMAIL_') && !dp16.includes('test123@qq.com'), dp16.slice(0, 90));
+const noPadB64 = mTextB64.slice(0, -1);
+const rp17s = await Hp.run([{ type: 'file', name: 'n.txt', content: noPadB64 }]);
+t('M17 非4倍数伪base64-不判定-按strip剥离', rp17s.received !== null && !JSON.stringify(rp17s.received).includes(noPadB64), JSON.stringify(rp17s.received.messages[0].content));
+const punctText = Buffer.from('!@#$%^&*()'.repeat(12), 'utf8').toString('base64');
+const rp18 = await Hpb.run([{ type: 'file', name: 'n.txt', content: punctText }]);
+t('M18 解码无字母数字-不判为文本-仍拦截', rp18.received === null && rp18.reason.kind === 'error', JSON.stringify(rp18.reason).slice(0, 120));
+const rp19 = await Hpb.run([{ type: 'file', name: 'n.txt', meta: { a: { b: { c: { d: mTextB64 } } } } }]);
+t('M19 深度超限不可判定-block 拦截', rp19.received === null && rp19.reason.kind === 'error', JSON.stringify(rp19.reason).slice(0, 120));
+const rp20 = await Hp.run([{ type: 'image', attachment: { attachmentId: 'att-abc123', mediaType: 'image/png' } }]);
+t('M20 官方attachment引用块无载荷-默认仍剥离', rp20.received !== null && rp20.received.messages[0].content.length === 0, JSON.stringify(rp20.received.messages[0].content));
+const Hraw2 = imageHarness({ preflightBase64: true, nonTextPolicy: 'allow', allowRawMedia: true });
+const rp20b = await Hraw2.run([{ type: 'image', attachment: { attachmentId: 'att-abc123', mediaType: 'image/png' } }]);
+t('M20b 预检不影响 allowRawMedia 显式放行', rp20b.received !== null && rp20b.received.messages[0].content.length === 1, JSON.stringify(rp20b.received.messages[0].content));
+const rp21 = await Hpb.run([{ type: 'file', name: 'x'.repeat(70000), content: mTextB64 }]);
+t('M21 超大非文本元数据不可判定-不崩不泄', rp21.received === null && rp21.reason.kind === 'error', JSON.stringify(rp21.reason).slice(0, 120));
+
 // N. 严格模式：未检查字段/异常默认拦截（failClosed 与 strictUnknown 默认开）
 function rawHarness(config) {
   let listener = null;
