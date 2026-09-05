@@ -50,9 +50,30 @@ const inputBase: React.CSSProperties = {
 }
 const errorStyle: React.CSSProperties = { fontSize: 12, color: '#e5484d' }
 const linkStyle: React.CSSProperties = { color: 'inherit' }
+/** 分区：顶部细线分隔，把长清单拆成可扫读的小节 */
+const section: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 10,
+  borderTop: '1px solid var(--dsh-border, rgba(128,128,128,.22))',
+  paddingTop: 12,
+}
+const sectionLabel: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: 'var(--dsh-text-2, #888)' }
+const sectionSub: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: 'var(--dsh-text-3, #aaa)' }
+/** 操作按钮行（复制状态 / 复制更新命令 并排） */
+const actionsRow: React.CSSProperties = { display: 'flex', gap: 8, justifyContent: 'flex-end' }
+/** 免责声明警示框（低对比，不打断主操作） */
+const disclaimerBox: React.CSSProperties = {
+  fontSize: 12,
+  color: 'var(--dsh-text-2, #888)',
+  border: '1px solid rgba(229, 72, 77, .35)',
+  borderRadius: 6,
+  padding: '8px 10px',
+  background: 'rgba(229, 72, 77, .06)',
+}
 /** 插件适配的 dsh 宿主范围（与 README 一致；功能随宿主能力自动降级） */
 export const DSH_SUPPORT = 'dsh 0.1.0-rc.6+（官方 npm）与 0.1.2 开发线'
-/** 简版责任声明（完整版见 README「责任与边界」） */
+/** 免责声明（完整版见 README「责任与边界」） */
 export const DISCLAIMER = '脱敏为启发式本地处理，无法保证零漏检；重要数据请自行评估并保留原文。'
 /** 插件版本（与 package.json 同步；accuracy 测试强制一致，避免发版漂移） */
 export const PLUGIN_VERSION = '0.2.42'
@@ -273,28 +294,32 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
       <div style={{ fontSize: 12, color: 'var(--dsh-text-2, #888)' }}>插件版本：v{PLUGIN_VERSION}</div>
       {writable && cfg !== null ? (
         <>
-          {switchRow('enabled', '总开关')}
-          <div style={line}>
-            <span>全面脱敏（姓名/公司/机关）：{factsOn ? '已开启' : factsSomeOn ? '部分开启' : '已关闭'}</span>
-            <button
-              type="button"
-              disabled={!writable || saving !== null}
-              style={{ ...btnBase, opacity: writable ? 1 : 0.5 }}
-              onClick={toggleFacts}
-            >
-              {factsOn ? '关闭' : '全部开启'}
-            </button>
+          <div style={section}>
+            <div style={sectionLabel}>开关</div>
+            {switchRow('enabled', '总开关')}
+            <div style={line}>
+              <span>全面脱敏（姓名/公司/机关）：{factsOn ? '已开启' : factsSomeOn ? '部分开启' : '已关闭'}</span>
+              <button
+                type="button"
+                disabled={!writable || saving !== null}
+                style={{ ...btnBase, opacity: writable ? 1 : 0.5 }}
+                onClick={toggleFacts}
+              >
+                {factsOn ? '关闭' : '全部开启'}
+              </button>
+            </div>
+            {switchRow('redactNames', '姓名')}
+            {switchRow('redactCompanies', '公司')}
+            {switchRow('redactOrgs', '机关')}
+            {switchRow('redactAddress', '地址')}
+            {switchRow('redactCredentials', '密钥凭据')}
+            <div style={sectionSub}>默认保留项（开启后改为脱敏）</div>
+            {switchRow('redactCaseNumbers', '案号')}
+            {switchRow('redactDob', '出生日期')}
+            <div style={body}>当前生效：{active.join('、') || '无'}；保留：{kept.join('、') || '无'}。</div>
           </div>
-          {switchRow('redactNames', '姓名')}
-          {switchRow('redactCompanies', '公司')}
-          {switchRow('redactOrgs', '机关')}
-          {switchRow('redactCaseNumbers', '案号')}
-          {switchRow('redactDob', '出生日期')}
-          {switchRow('redactAddress', '地址')}
-          {switchRow('redactCredentials', '密钥凭据')}
-          <div style={body}>当前生效：{active.join('、') || '无'}；保留：{kept.join('、') || '无'}。</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <span style={{ fontSize: 13 }}>自定义敏感词（当事人姓名/别名/机构简称）：</span>
+          <div style={section}>
+            <div style={sectionLabel}>自定义敏感词（当事人姓名/别名/机构简称）</div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <input
                 style={inputBase}
@@ -329,35 +354,37 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
       ) : (
         <div style={body}>运行时开关不可用（settings 未挂载时保持配置文件模式）。{error ? ' ' + error : ''}</div>
       )}
-      <div style={body}>
-        发往云端前，姓名、身份证、电话、邮箱、地址、公司/单位名称与密钥凭据会被替换为占位符；涉案金额、日期、案号保留（便于金额核算与时效判断）。本地会话日志中的用户输入与工具结果同样遮罩。
+      <div style={section}>
+        <div style={sectionLabel}>使用说明</div>
+        <div style={body}>
+          发往云端前，姓名、身份证、电话、邮箱、地址、公司/单位名称与密钥凭据会被替换为占位符；涉案金额、日期、案号保留（便于金额核算与时效判断）。本地会话日志中的用户输入与工具结果同样遮罩。
+        </div>
+        <div style={actionsRow}>
+          <button type="button" style={btnBase} onClick={copyStatusCommand}>
+            {copiedStatus ? '已复制 ✓' : '复制状态'}
+          </button>
+          <button
+            type="button"
+            disabled={saving !== null}
+            style={btnBase}
+            onClick={copyUpdateCommand}
+          >
+            {copied ? '已复制 ✓' : '复制更新命令'}
+          </button>
+        </div>
+        <div style={body}>更新命令复制后在终端运行，并重启 dsh web 生效；复制状态文本可用于审计留档。</div>
+        <div style={body}>此处为常用开关；案号/出生日期/严格模式等其余选项请在配置文件中调整（$DSH_HOME/profiles/web/cordis.patch.yml）。</div>
       </div>
-      <div style={line}>
-        <span>状态：</span>
-        <button type="button" style={btnBase} onClick={copyStatusCommand}>
-          {copiedStatus ? '已复制 ✓' : '复制状态'}
-        </button>
-      </div>
-      <div style={line}>
-        <span>更新：</span>
-        <button
-          type="button"
-          disabled={saving !== null}
-          style={btnBase}
-          onClick={copyUpdateCommand}
-        >
-          {copied ? '已复制 ✓' : '复制更新命令'}
-        </button>
-      </div>
-      <div style={body}>复制后在终端运行该命令，并重启 dsh web 生效。</div>
-      <div style={body}>此处为常用开关；案号/出生日期/严格模式等其余选项请在配置文件中调整（$DSH_HOME/profiles/web/cordis.patch.yml）。</div>
-      <div style={body}>{DSH_SUPPORT}；功能随宿主能力自动降级。</div>
-      <div style={body}>{DISCLAIMER}</div>
-      <div style={body}>
-        作者：JunyuZhan · 项目：
-        <a style={linkStyle} href="https://github.com/JunyuZhan/dsh-privmask" target="_blank" rel="noreferrer">GitHub</a>
-        {' '}· 问题反馈：
-        <a style={linkStyle} href="https://github.com/JunyuZhan/dsh-privmask/issues" target="_blank" rel="noreferrer">Issues</a>
+      <div style={section}>
+        <div style={sectionLabel}>关于</div>
+        <div style={body}>适配宿主：{DSH_SUPPORT}；功能随宿主能力自动降级。</div>
+        <div style={disclaimerBox}>免责声明：{DISCLAIMER}</div>
+        <div style={body}>
+          作者：JunyuZhan · 项目：
+          <a style={linkStyle} href="https://github.com/JunyuZhan/dsh-privmask" target="_blank" rel="noreferrer">GitHub</a>
+          {' '}· 问题反馈：
+          <a style={linkStyle} href="https://github.com/JunyuZhan/dsh-privmask/issues" target="_blank" rel="noreferrer">Issues</a>
+        </div>
       </div>
     </div>
   )
