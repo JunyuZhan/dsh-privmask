@@ -1053,33 +1053,35 @@ ocrWrite(acFile2, JSON.stringify({ v: 1, ts: '2026-09-06T00:00:00.000Z', decisio
 const acRun2 = acSpawn(process.execPath, [auditCli, '--file', acFile2], { encoding: 'utf8' });
 t('AC2 审计摘要-无raw时正常退出0', acRun2.status === 0 && (acRun2.stdout || '').includes('dropped=1'), (acRun2.stdout || '') + (acRun2.stderr || ''));
 
-// AD. PDF 脱敏预检 CLI（tools/pdf-preflight.mjs）：文本层提取→脱敏→预览/报告（依赖 poppler，缺失时跳过）
-const pdfTool = acFileUrl(new URL('../tools/pdf-preflight.mjs', import.meta.url));
-const havePdftotextBin = acSpawn('pdftotext', ['-v']).status === 0;
-const adDir = auditTmp(auditJoin(auditOsTmp(), 'privmask-pdf-cli-'));
-const adPdf = auditJoin(adDir, 'sample.pdf');
-if (havePdftotextBin) {
-  const adContent = 'BT /F1 14 Tf 72 720 Td (Please contact 13800138000 or test123@qq.com.) Tj ET\n';
-  const adObjs = [
+function writeSamplePdf(path) {
+  const content = 'BT /F1 14 Tf 72 720 Td (Please contact 13800138000 or test123@qq.com for case details.) Tj ET\n';
+  const objs = [
     null,
     '<< /Type /Catalog /Pages 2 0 R >>',
     '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
     '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-    '<< /Length ' + adContent.length + ' >>\nstream\n' + adContent + 'endstream',
+    '<< /Length ' + content.length + ' >>\nstream\n' + content + 'endstream',
   ];
-  let adOut = '%PDF-1.4\n';
-  const adOffs = [];
+  let out = '%PDF-1.4\n';
+  const offs = [];
   for (let i = 1; i <= 5; i++) {
-    adOffs[i] = adOut.length;
-    adOut += i + ' 0 obj\n' + adObjs[i] + '\nendobj\n';
+    offs[i] = out.length;
+    out += i + ' 0 obj\n' + objs[i] + '\nendobj\n';
   }
-  const adXref = adOut.length;
-  adOut += 'xref\n0 6\n0000000000 65535 f \n';
-  for (let i = 1; i <= 5; i++) adOut += String(adOffs[i]).padStart(10, '0') + ' 00000 n \n';
-  adOut += 'trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n' + adXref + '\n%%EOF\n';
-  ocrWrite(adPdf, adOut);
+  const xref = out.length;
+  out += 'xref\n0 6\n0000000000 65535 f \n';
+  for (let i = 1; i <= 5; i++) out += String(offs[i]).padStart(10, '0') + ' 00000 n \n';
+  out += 'trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF\n';
+  ocrWrite(path, out);
 }
+
+// AD. PDF 脱敏预检 CLI（tools/pdf-preflight.mjs）：文本层提取→脱敏→预览/报告（依赖 poppler，缺失时跳过）
+const pdfTool = acFileUrl(new URL('../tools/pdf-preflight.mjs', import.meta.url));
+const havePdftotextBin = acSpawn('pdftotext', ['-v']).status === 0;
+const adDir = auditTmp(auditJoin(auditOsTmp(), 'privmask-pdf-cli-'));
+const adPdf = auditJoin(adDir, 'sample.pdf');
+if (havePdftotextBin) writeSamplePdf(adPdf);
 const adRun = acSpawn(process.execPath, [pdfTool, adPdf, '--out-dir', adDir, '--report', auditJoin(adDir, 'report.json')], { encoding: 'utf8' });
 const adPreview = (() => {
   try { return auditRead(auditJoin(adDir, 'sample.redacted.txt'), 'utf8'); } catch { return ''; }
@@ -1089,6 +1091,28 @@ const adReport = (() => {
 })();
 t('AD1 PDF文本层脱敏预览-命中且原文不出', !havePdftotextBin || (adRun.status === 0 && adPreview.includes('[REDACTED_MOBILE_') && adPreview.includes('[REDACTED_EMAIL_') && !adPreview.includes('13800138000') && !adPreview.includes('test123@qq.com')), (adRun.stdout || '') + (adRun.stderr || '') + adPreview.slice(0, 200));
 t('AD2 PDF预检报告-页级统计', !havePdftotextBin || (adReport !== null && adReport.totals.redactedPages === 1 && adReport.files[0].pages[0].counts.mobile === 1 && adReport.files[0].pages[0].counts.email === 1), JSON.stringify(adReport || (adRun.stderr || '')).slice(0, 240));
+
+// AE. PDF 覆写式脱敏（tools/redact-pdf.mjs）：涂黑敏感词→图片型脱敏 PDF（依赖 poppler+gs，缺失时跳过）
+const haveGsBin = acSpawn('gs', ['--version']).status === 0;
+const redactPdfTool = acFileUrl(new URL('../tools/redact-pdf.mjs', import.meta.url));
+const aePdf = auditJoin(adDir, 'redact-sample.pdf');
+const aeOutDir = auditJoin(adDir, 'redacted');
+const aeReportFile = auditJoin(adDir, 'redact-report.json');
+if (havePdftotextBin && haveGsBin) writeSamplePdf(aePdf);
+const aeRun = acSpawn(process.execPath, [redactPdfTool, aePdf, '--out-dir', aeOutDir, '--report', aeReportFile], { encoding: 'utf8' });
+const aeReport = (() => {
+  try { return JSON.parse(auditRead(aeReportFile, 'utf8')); } catch { return null; }
+})();
+const aeOutText = (() => {
+  try {
+    const pdf = auditJoin(aeOutDir, 'redact-sample.redacted.pdf');
+    const r = acSpawn('pdftotext', [pdf, '-'], { encoding: 'utf8' });
+    return (r.stdout || '').replace(/\s+/g, '');
+  } catch { return ''; }
+})();
+t('AE1 覆写式脱敏输出图片型PDF且无文本层', !havePdftotextBin || !haveGsBin || (aeRun.status === 0 && aeReport !== null && aeReport.files[0].coveredTotal >= 2 && aeOutText === ''), (aeRun.stdout || '') + (aeRun.stderr || '') + JSON.stringify(aeReport || {}).slice(0, 200));
+const aeInfo = havePdftotextBin && haveGsBin ? acSpawn('pdfinfo', [auditJoin(aeOutDir, 'redact-sample.redacted.pdf')], { encoding: 'utf8' }) : null;
+t('AE2 覆写式脱敏输出页数与尺寸有效', !havePdftotextBin || !haveGsBin || (aeInfo.status === 0 && /^Pages:\s+1/m.test(aeInfo.stdout || '') && /^Page size:\s+612 x 792 pts/m.test(aeInfo.stdout || '')), aeInfo ? (aeInfo.stdout || '') + (aeInfo.stderr || '') : '');
 
 // Z. 本地脱敏对照工具：原文 → 脱敏 → 还原 三份对照
 const { execSync } = await import('node:child_process');

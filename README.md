@@ -39,6 +39,9 @@ DeepSeek Harness 本地脱敏插件：在请求发往云端大模型之前，将
 - **PDF 脱敏预检 CLI**：`node tools/pdf-preflight.mjs <输入.pdf> --report out.json [--ocr]`
   逐页提取文本层（扫描页可本地 OCR），走同一套脱敏规则后导出 `.redacted.txt` 预览与命中报告，
   原 PDF 不被改写；预览即“云端会读到的内容”，用于上云前核对
+- **PDF 覆写式脱敏原型**：`node tools/redact-pdf.mjs <输入.pdf> --report out.json`
+  按文本层定位敏感片段 → gs 栅格化 → 像素涂黑 → 重组为图片型脱敏 PDF（无文本层，适合外发/留档）；
+  依赖 poppler + ghostscript，输出文件较大且不可再选字，属有损但有保障的覆写方案
 - **本地 OCR 兜底**：启用 `localOcr` 后图片附件先在本地（`~/.ocr-tool`）转成 OCR 文本，再走常规脱敏上云；OCR 失败默认以说明文本替代、`block` 策略下整体拒绝，绝不因“想发图片”而降级为原样透传
 - **隐私优先（默认）**：姓名、身份证、联系方式、地址、公司/单位名称等能唯一锁定对象的信息默认脱敏；案号、出生日期、涉案金额等公开可查或办案所需信息默认保留
 - **会话一致性**：同一会话内同一值跨请求映射到同一占位符，模型可跨轮关联实体；不同会话相互隔离
@@ -239,14 +242,15 @@ node tools/redact-text.mjs input.txt out.txt --config cfg.json
   docx 自 0.2.39 起提供本地文本层脱敏工具（不跨分段识别，见上方说明）；
   base64 文本预检自 0.2.42 起可对“文本编码成 base64”的载荷做解码脱敏（默认关）；
   图片自 0.2.42 起可通过 `localOcr` 在本地 OCR 成文本后脱敏上云（默认关，依赖 `~/.ocr-tool`）；
-  PDF 自 0.2.42 起提供 `tools/pdf-preflight.mjs` 本地预检与脱敏文本导出（依赖 poppler，扫描页可
-  本地 OCR）；对原 PDF 做覆写式脱敏仍属规划中的独立能力，未内置前不声明支持。
+  PDF 自 0.2.42 起提供 `tools/pdf-preflight.mjs`（预检与脱敏文本导出）与
+  `tools/redact-pdf.mjs`（覆写式图片型脱敏，依赖 poppler+ghostscript，有损）；
+  保留文本层的原样编辑型 PDF 脱敏仍属长期规划。
 
 ## 测试与 CI
 
 ```sh
 node test/self-test.js        # 14 项功能回归（端到端拦截 + 中文实体）
-node test/reliability-test.js # 171 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/base64文本预检/本地OCR兜底/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/词表热更新/字符串 content 还原/出站脱敏/离境审计/审计摘要CLI/PDF预检CLI）
+node test/reliability-test.js # 173 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/base64文本预检/本地OCR兜底/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/词表热更新/字符串 content 还原/出站脱敏/离境审计/审计摘要CLI/PDF预检CLI/PDF覆写脱敏）
 node test/accuracy-test.js    # 26 项准确性（法律文档矩阵/凭据/PII校验/证件与信用代码上下文/复姓/泛化机构与村镇/姓名标签边界/客户端版本一致性）
 node test/docx-test.js        # docx 本地脱敏（格式保留/非文本条目原样/占位符写入）
 node test/fuzz-test.js        # 300 例随机文本 × 2 断言（不崩 + 幂等，共 600 断言）
