@@ -3,6 +3,14 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.42] - 2026-09-05
+
+### 修复（适配自检日志）
+
+- 启动适配检查不再把 `settings` 报为“降级项”：settings 命名空间为惰性注册，
+  服务就绪后会自动启用；日志改为 `settings=惰性注册（服务就绪后自动启用）`，
+  仅保留 sessionController（展示层还原）作为真实降级项，避免误导用户以为开关失效。
+
 ## [0.2.41] - 2026-09-05
 
 ### 修复（docx 工具）
