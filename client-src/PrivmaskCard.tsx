@@ -50,6 +50,10 @@ const inputBase: React.CSSProperties = {
 }
 const errorStyle: React.CSSProperties = { fontSize: 12, color: '#e5484d' }
 const linkStyle: React.CSSProperties = { color: 'inherit' }
+/** 插件适配的 dsh 宿主范围（与 README 一致；功能随宿主能力自动降级） */
+export const DSH_SUPPORT = 'dsh 0.1.0-rc.6+（官方 npm）与 0.1.2 开发线'
+/** 简版责任声明（完整版见 README「责任与边界」） */
+export const DISCLAIMER = '脱敏为启发式本地处理，无法保证零漏检；重要数据请自行评估并保留原文。'
 
 export function PrivmaskCard(props: PrivmaskCardInjected) {
   const [enabled, setEnabled] = useState<boolean | null>(null)
@@ -291,6 +295,8 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
       </div>
       <div style={body}>复制后在终端运行该命令，并重启 dsh web 生效。</div>
       <div style={body}>此处为常用开关；案号/出生日期/严格模式等其余选项请在配置文件中调整（$DSH_HOME/profiles/web/cordis.patch.yml）。</div>
+      <div style={body}>{DSH_SUPPORT}；功能随宿主能力自动降级。</div>
+      <div style={body}>{DISCLAIMER}</div>
       <div style={body}>
         作者：JunyuZhan · 项目：
         <a style={linkStyle} href="https://github.com/JunyuZhan/dsh-privmask" target="_blank" rel="noreferrer">GitHub</a>
