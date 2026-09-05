@@ -51,6 +51,13 @@
 - 可靠性测试 162 → 167（AB1-AB4：图片 OCR 文本脱敏上云、工具结果内嵌图片、
   OCR 失败说明文本/block 拒绝、纯文本模型能力上报软化）。
 
+### 工具（离境审计摘要 CLI）
+
+- 新增 `tools/audit-summary.mjs`：汇总 `privmask-egress.jsonl`（决策 masked/clean/blocked/error、
+  媒体 raw/preflight/dropped、脱敏类别 Top），容忍损坏行；存在 `rawMedia` 时打印告警并
+  以退出码 2 提示，便于巡检/CI 发现“媒体原样离境”。
+- 可靠性测试 167 → 169（AC1-AC2：摘要统计/告警/损坏行容错/raw 退出码 2、无 raw 正常退出 0）。
+
 ## [0.2.41] - 2026-09-05
 
 ### 修复（docx 工具）

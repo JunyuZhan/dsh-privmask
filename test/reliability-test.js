@@ -1033,6 +1033,26 @@ const Ho4 = ocrHarness({}, [process.execPath, ocrOkScript]);
 const ab4 = await Ho4.resolve('t', 'm');
 t('AB4 纯文本模型能力上报软化以放行图片检查', ab4 && ab4.inputModalities === undefined, JSON.stringify(ab4));
 
+// AC. 审计摘要 CLI（tools/audit-summary.mjs）：汇总/告警/损坏行容错/退出码
+const { spawnSync: acSpawn } = await import('node:child_process');
+const { fileURLToPath: acFileUrl } = await import('node:url');
+const auditCli = acFileUrl(new URL('../tools/audit-summary.mjs', import.meta.url));
+const acDir = auditTmp(auditJoin(auditOsTmp(), 'privmask-audit-cli-'));
+const acFile = auditJoin(acDir, 'privmask-egress.jsonl');
+const acLines = [
+  JSON.stringify({ v: 1, ts: '2026-09-06T00:00:00.000Z', provider: 'p1', model: 'm', decision: 'masked', fields: 1, counts: { email: 2 }, media: { dropped: 0, preflight: 0, raw: 0 }, rawMedia: false }),
+  JSON.stringify({ v: 1, ts: '2026-09-06T00:00:01.000Z', provider: 'p2', model: 'm', decision: 'clean', media: { dropped: 0, preflight: 0, raw: 1 }, rawMedia: true }),
+  JSON.stringify({ v: 1, ts: '2026-09-06T00:00:02.000Z', provider: 'p3', model: 'm', decision: 'blocked' }),
+  'this is not json',
+];
+ocrWrite(acFile, acLines.join('\n') + '\n');
+const acRun = acSpawn(process.execPath, [auditCli, '--file', acFile], { encoding: 'utf8' });
+t('AC1 审计摘要-统计/告警/损坏行容错/raw退出码2', acRun.status === 2 && (acRun.stdout || '').includes('媒体原样离境') && (acRun.stdout || '').includes('masked=1') && (acRun.stdout || '').includes('raw=1') && (acRun.stdout || '').includes('损坏行(忽略): 1'), (acRun.stdout || '') + (acRun.stderr || ''));
+const acFile2 = auditJoin(acDir, 'clean.jsonl');
+ocrWrite(acFile2, JSON.stringify({ v: 1, ts: '2026-09-06T00:00:00.000Z', decision: 'clean', media: { dropped: 1, preflight: 0, raw: 0 } }) + '\n');
+const acRun2 = acSpawn(process.execPath, [auditCli, '--file', acFile2], { encoding: 'utf8' });
+t('AC2 审计摘要-无raw时正常退出0', acRun2.status === 0 && (acRun2.stdout || '').includes('dropped=1'), (acRun2.stdout || '') + (acRun2.stderr || ''));
+
 // Z. 本地脱敏对照工具：原文 → 脱敏 → 还原 三份对照
 const { execSync } = await import('node:child_process');
 const { writeFileSync, mkdtempSync } = await import('node:fs');
