@@ -32,6 +32,7 @@ DeepSeek Harness 本地脱敏插件：在请求发往云端大模型之前，将
 - **脱敏对照工具**：`npm run mask:preview -- <文件> [--redactFacts]` 输出原文 / 脱敏后（发往云端）/ 还原后三份对照，纯本地不发送数据
 - **日志脱敏**：用户输入（`agent/pre-step`）与工具结果（`tools/post-execute`）在写入会话日志前遮罩，原则上不落明文（dsh 个别内部事件会保留原文副本，见[已知限制](#已知限制)）；模型回复仍由入站还原为真值
 - **严格模式**：脱敏异常（failClosed）、未检查字段（strictUnknown）默认拒绝请求；非文本内容默认剥离（nonTextPolicy=strip），图片字节不出本地
+- **base64 文本预检**：开启 `preflightBase64` 后，携带 base64 载荷的媒体/文件块若可判定为 UTF-8 文本，会在本地解码、按同一套规则脱敏后回编码再上云；图片等二进制内容无法判定，仍走 `nonTextPolicy` 门禁
 - **隐私优先（默认）**：姓名、身份证、联系方式、地址、公司/单位名称等能唯一锁定对象的信息默认脱敏；案号、出生日期、涉案金额等公开可查或办案所需信息默认保留
 - **会话一致性**：同一会话内同一值跨请求映射到同一占位符，模型可跨轮关联实体；不同会话相互隔离
 - **类别化配置**：凭据 / 地址 / 姓名 / 公司 / 机关 / 案号 / 出生日期 分别开关，按场景组合
@@ -147,6 +148,7 @@ node tools/redact-text.mjs input.txt out.txt --config cfg.json
 | `restoreInbound` | `true` | 入站还原：云端返回的占位符在本地还原为原值（响应显示、工具执行），下次出站重新脱敏；历史展示层还原依赖 `persistMapping: true` |
 | `nonTextPolicy` | `strip` | 非文本内容策略：`strip`=移除后放行、`block`=拒绝请求、`allow`=透传（0.2.41 起默认仍需 `allowRawMedia: true` 才真正放行） |
 | `allowRawMedia` | `false` | 显式承担风险后才允许图片/文件原样透传（默认 false：`allow` 也拒绝，先本地 OCR/脱敏再发送更符合“凡离境必先脱敏”） |
+| `preflightBase64` | `false` | base64 文本预检：媒体/文件块中可判定为 UTF-8 文本的 base64 载荷，先本地解码脱敏再回编码上云；二进制（如图片像素）与不可判定内容仍按 `nonTextPolicy` 处置（不是 OCR） |
 | `longTokens` | `true` | 长 hex/base64 串脱敏 |
 | `redactToolMeta` | `true` | 工具描述/参数 schema 中的敏感信息脱敏（担心遮罩影响模型理解工具时可设 false） |
 | `redactPaths` | `false` | 绝对路径脱敏（开启会破坏文件工具的路径回传） |
@@ -223,15 +225,16 @@ node tools/redact-text.mjs input.txt out.txt --config cfg.json
 - **`agent/inbox/spliced` 事件保留用户消息原文**：dsh 在用户消息进入 inbox 队列时以原文落盘该会话事件，该事件早于 `agent/pre-step` 且无插件改写缝（`session/event` 为只读观察），privmask 无法遮罩这一份日志副本；模型上下文与出站请求仍使用遮罩后的 `user/message`，不受影响。
 - **`nonTextPolicy: block` 时用户消息会被整体拒绝**：图片/文件块在 `agent/pre-step` 即触发步骤拒绝（`reject`），不写入日志也不上云。
 - **内存映射**：占位符映射仅存于内存，进程重启后会话内映射即失效；单类别超过 2000 个不同值后最旧映射被逐出（编号不复用），被逐出的旧占位符不再还原；引擎另有 200 个会话上限（超限淘汰最旧会话），极端规模下内存占用可能仍较大；云端侧不可逆，无法还原。
-- **仅处理文本/文本块（对话与 docx 文本层）**：对话、工具文本在出站前脱敏；
+- **仅处理文本/文本块（对话、docx 文本层与 base64 文本载荷）**：对话、工具文本在出站前脱敏；
   docx 自 0.2.39 起提供本地文本层脱敏工具（不跨分段识别，见上方说明）；
+  base64 文本预检自 0.2.42 起可对“文本编码成 base64”的载荷做解码脱敏（默认关）；
   PDF 与图片（OCR 后遮罩）仍属规划中的独立能力，未内置前不声明支持。
 
 ## 测试与 CI
 
 ```sh
 node test/self-test.js        # 14 项功能回归（端到端拦截 + 中文实体）
-node test/reliability-test.js # 139 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/词表热更新/字符串 content 还原/出站脱敏）
+node test/reliability-test.js # 148 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/base64文本预检/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/词表热更新/字符串 content 还原/出站脱敏）
 node test/accuracy-test.js    # 26 项准确性（法律文档矩阵/凭据/PII校验/证件与信用代码上下文/复姓/泛化机构与村镇/姓名标签边界/客户端版本一致性）
 node test/docx-test.js        # docx 本地脱敏（格式保留/非文本条目原样/占位符写入）
 node test/fuzz-test.js        # 300 例随机文本 × 2 断言（不崩 + 幂等，共 600 断言）

@@ -253,6 +253,42 @@ t('M5b allowRawMedia=true 显式承担风险后放行', ra2.received !== null &&
 const rt1 = await Hi.run([{ type: 'tool-result', toolCallId: 'c1', content: [{ type: 'image', image: mB64 }] }]);
 t('M6 tool-result 内图片默认剥离', rt1.received !== null && !JSON.stringify(rt1.received).includes(mB64), JSON.stringify(rt1.received.messages[0].content));
 
+// M7-M13 base64 文本预检（preflightBase64，默认关）：可判定为 UTF-8 文本的载荷本地脱敏后回编码放行；
+// 二进制/不可判定仍按 nonTextPolicy 处置。不是 OCR，不解图片像素。
+const mText = '原告张三诉被告李四民间借贷纠纷，电话13800138000，邮箱test123@qq.com。';
+const mTextB64 = Buffer.from(mText, 'utf8').toString('base64');
+const decodeOut = (content) => {
+  const b = Array.isArray(content) && content[0] ? content[0] : null;
+  const raw = b && typeof b.content === 'string' ? b.content : (b && typeof b === 'string' ? b : '');
+  return raw ? Buffer.from(raw, 'base64').toString('utf8') : '';
+};
+const Hp = imageHarness({ preflightBase64: true });
+const rp1 = await Hp.run([{ type: 'file', name: 'note.txt', mime: 'text/plain', content: mTextB64 }]);
+const dp1 = decodeOut(rp1.received && rp1.received.messages[0].content);
+t('M7 base64文本预检-解码脱敏后放行', rp1.received !== null && dp1.includes('[REDACTED_NAME_') && dp1.includes('[REDACTED_MOBILE_') && !dp1.includes('张三') && !dp1.includes('13800138000'), dp1.slice(0, 90));
+const rp1b = await Hp.run(rp1.received.messages[0].content);
+const dp1b = decodeOut(rp1b.received && rp1b.received.messages[0].content);
+t('M7b base64预检幂等-二次不新增占位符', dp1b === dp1, dp1b.slice(0, 90));
+const rp2 = await Hp.run([{ type: 'image', image: { kind: 'base64', data: 'data:text/plain;base64,' + mTextB64 } }]);
+const c2 = rp2.received && rp2.received.messages[0].content[0];
+const d2 = c2 && c2.image && typeof c2.image.data === 'string' ? Buffer.from(c2.image.data.slice(c2.image.data.indexOf(',') + 1), 'base64').toString('utf8') : '';
+t('M8 嵌套 dataURL 前缀保留且内容脱敏', rp2.received !== null && c2.image.data.startsWith('data:text/plain;base64,') && d2.includes('[REDACTED_EMAIL_') && !d2.includes('test123@qq.com'), d2.slice(0, 90));
+const rp3 = await Hp.run([{ type: 'image', image: mB64 }]);
+t('M9 二进制图片不可判定-默认仍剥离', rp3.received !== null && !JSON.stringify(rp3.received).includes(mB64), JSON.stringify(rp3.received.messages[0].content));
+const Hpb = imageHarness({ preflightBase64: true, nonTextPolicy: 'block' });
+const rp4 = await Hpb.run([{ type: 'image', image: mB64 }]);
+t('M10 二进制不可判定-block 策略仍拦截', rp4.received === null && rp4.reason.kind === 'error' && rp4.reason.failure.code === 'PRIVMASK_NON_TEXT_BLOCKED', JSON.stringify(rp4.reason));
+const rp5 = await Hpb.run([{ type: 'file', name: 'n.txt', content: mTextB64 }]);
+const dp5 = decodeOut(rp5.received && rp5.received.messages[0].content);
+t('M11 block 下文本预检成功-放行脱敏后内容', rp5.received !== null && dp5.includes('[REDACTED_NAME_') && !dp5.includes('张三'), dp5.slice(0, 90));
+const rp5b = await Hpb.run([{ type: 'file', name: 'test123@qq.com.docx', content: mTextB64 }]);
+t('M11b 预检放行时同块元数据一并脱敏', rp5b.received !== null && rp5b.received.messages[0].content[0].name.includes('[REDACTED_EMAIL_') && !JSON.stringify(rp5b.received).includes('test123@qq.com'), JSON.stringify(rp5b.received.messages[0].content[0].name));
+const rp6 = await Hi.run([{ type: 'file', name: 'n.txt', content: mTextB64 }]);
+t('M12 默认关-文本base64仍按strip剥离', rp6.received !== null && !JSON.stringify(rp6.received).includes(mTextB64), JSON.stringify(rp6.received.messages[0].content));
+const Hlen = imageHarness({ preflightBase64: true, nonTextPolicy: 'block' });
+const rp7 = await Hlen.run([{ type: 'file', name: 'big.bin', content: Buffer.alloc(8 * 1024 * 1024).toString('base64') }]);
+t('M13 超长base64不可判定-block 拦截不崩', rp7.received === null && rp7.reason.kind === 'error', JSON.stringify(rp7.reason).slice(0, 120));
+
 // N. 严格模式：未检查字段/异常默认拦截（failClosed 与 strictUnknown 默认开）
 function rawHarness(config) {
   let listener = null;

@@ -10,6 +10,10 @@ export interface Config {
   redactToolMeta?: boolean;
   persistMapping?: boolean;
   nonTextPolicy?: 'block' | 'strip' | 'allow';
+  /** 显式承认风险后才允许非文本原样透传（默认 false） */
+  allowRawMedia?: boolean;
+  /** base64 文本预检（默认关）：可判定为 UTF-8 文本的 base64 载荷先本地脱敏再上云 */
+  preflightBase64?: boolean;
   longTokens?: boolean;
   dropSessionId?: boolean;
   cnEntities?: boolean;
