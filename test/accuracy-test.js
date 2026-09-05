@@ -791,6 +791,63 @@ test('客户端产物与 manifest 跨版本一致性', async () => {
     || !hrefs.includes('https://github.com/JunyuZhan/dsh-privmask/issues')) {
     throw new Error('卡片署名链接缺失: ' + JSON.stringify(hrefs))
   }
+
+  // —— 点击级：逐个执行开关按钮的 onClick，断言写入字段与翻转值 ——
+  const propsClick = card.inject()
+  const clickCalls = []
+  const clickUpdate = propsClick.update
+  propsClick.update = async (...a) => { clickCalls.push(a); return clickUpdate(...a) }
+  hookIndex = 0
+  const clickTree = cardComp(propsClick)
+  const fieldByLabel = {
+    '总开关': 'enabled', '姓名': 'redactNames', '公司': 'redactCompanies', '机关': 'redactOrgs',
+    '案号': 'redactCaseNumbers', '出生日期': 'redactDob', '地址': 'redactAddress', '密钥凭据': 'redactCredentials',
+  }
+  const factsKeys = ['redactNames', 'redactCompanies', 'redactOrgs']
+  const rows = []
+  function collectRows(node) {
+    if (Array.isArray(node)) { node.forEach(collectRows); return }
+    if (node && node.__privmaskJsx && node.type === 'div' && Array.isArray(node.props.children)) {
+      const btn = node.props.children.find((c) => c && c.__privmaskJsx && c.type === 'button')
+      if (btn) {
+        const labelParts = []
+        const walkLabel = (c) => {
+          if (typeof c === 'string' || typeof c === 'number') { labelParts.push(String(c)); return }
+          if (Array.isArray(c)) { c.forEach(walkLabel); return }
+          if (c && c.__privmaskJsx && c.type !== 'button') walkLabel(c.props.children)
+        }
+        node.props.children.forEach(walkLabel)
+        rows.push({ text: labelParts.join(''), button: btn.props.onClick })
+      }
+    }
+    if (node && node.__privmaskJsx) collectRows(node.props.children)
+  }
+  collectRows(clickTree)
+  let clicked = 0
+  for (const row of rows) {
+    const name = Object.keys(fieldByLabel).find((k) => row.text.includes(k) && row.text.includes('：'))
+    if (!name || typeof row.button !== 'function') continue
+    if (row.text.includes('全面脱敏')) continue
+    const field = fieldByLabel[name]
+    const expected = !Boolean(renderStates.cfg[field])
+    const before = clickCalls.length
+    row.button()
+    clicked += 1
+    if (clickCalls.length !== before + 1) throw new Error('开关未调用 update: ' + name)
+    const [ns, patch, rev] = clickCalls[clickCalls.length - 1]
+    if (ns !== 'privmask' || patch[field] !== expected) throw new Error('开关写入字段不符: ' + name)
+  }
+  const factsRow = rows.find((r) => r.text.includes('全面脱敏') && typeof r.button === 'function')
+  if (factsRow) {
+    const before = clickCalls.length
+    factsRow.button()
+    clicked += 1
+    const [, patch] = clickCalls[clickCalls.length - 1]
+    if (clickCalls.length !== before + 1 || !factsKeys.every((k) => patch[k] === false)) {
+      throw new Error('全面脱敏一键关闭未写三字段')
+    }
+  }
+  if (clicked < 8) throw new Error('点击级覆盖不足: ' + clicked)
 })
 
 test('配置矩阵：全面脱敏档', async () => {

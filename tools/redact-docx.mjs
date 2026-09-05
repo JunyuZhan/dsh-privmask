@@ -71,7 +71,7 @@ for (const input of inputs) {
     const summary = Object.entries(stats.counts).map(([k, v]) => k + '=' + v).join(', ')
     console.log('已生成脱敏副本：' + output)
     console.log('  文本节点 ' + stats.nodes + (wholeParagraph ? '，整段合并 ' + stats.wholeParagraphs : '') + '，命中：' + (summary || '无'))
-    report.push({ input, output, stats })
+    report.push({ input, output, stats, crossRunNotChecked: !wholeParagraph })
   } catch (e) {
     failed += 1
     console.error('处理失败：' + input + ' —— ' + (e && e.message ? e.message : e))
@@ -83,5 +83,5 @@ if (reportPath) {
   console.log('报告已写入：' + reportPath)
 }
 if (wholeParagraph) console.log('注意：整段合并会把段落格式并入首 run，请用 Word 抽查后再使用。')
-else if (inputs.length > 1) console.log('注意：未开启 --whole-paragraph 时不跨 Word 文本分段识别；敏感值被拆成多段时请开启该选项。')
+else console.log('注意：默认模式不跨 Word 文本分段识别；报告已标注 crossRunNotChecked，重要文档请用 --whole-paragraph 复核。')
 process.exit(failed > 0 ? 1 : 0)
