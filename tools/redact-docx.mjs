@@ -9,9 +9,13 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { redactDocx } from '../lib/docx.js'
 
-const [, , inputArg, outputArg] = process.argv
+const args = process.argv.slice(2)
+const wholeParagraph = args.includes('--whole-paragraph')
+const positional = args.filter((a) => !a.startsWith('--'))
+const inputArg = positional[0]
+const outputArg = positional[1]
 if (!inputArg) {
-  console.error('用法：node tools/redact-docx.mjs <输入.docx> [输出.docx]')
+  console.error('用法：node tools/redact-docx.mjs <输入.docx> [输出.docx] [--whole-paragraph]')
   process.exit(2)
 }
 
@@ -23,9 +27,10 @@ if (resolve(output) === input) {
 }
 
 const raw = await readFile(input)
-const { buffer, stats } = redactDocx(raw)
+const { buffer, stats } = redactDocx(raw, {}, { wholeParagraph })
 await writeFile(output, buffer)
 const summary = Object.entries(stats.counts).map(([k, v]) => k + '=' + v).join(', ')
 console.log('已生成脱敏副本：' + output)
-console.log('处理文本节点：' + stats.nodes + '，命中类别：' + (summary || '无'))
-console.log('注意：MVP 不跨 Word 文本分段识别；如需高保证请抽样核对。')
+console.log('处理文本节点：' + stats.nodes + (wholeParagraph ? '，整段合并段数：' + stats.wholeParagraphs : '') + '，命中类别：' + (summary || '无'))
+if (wholeParagraph) console.log('注意：整段合并会把段落格式并入首 run，请用 Word 抽查后再使用。')
+else console.log('注意：未开启 --whole-paragraph 时不跨 Word 文本分段识别；敏感值被拆成多段时请开启该选项。')

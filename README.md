@@ -88,9 +88,12 @@ npm install dsh-privmask
 ```sh
 node tools/redact-docx.mjs input.docx                # 生成 input.redacted.docx
 node tools/redact-docx.mjs input.docx output.docx    # 指定输出路径
+node tools/redact-docx.mjs input.docx --whole-paragraph  # 按整段合并识别跨 run 敏感值
 ```
 
-已知边界：按 Word 文本节点（`<w:t>`）处理，不跨分段识别被拆开的敏感值；
+占位符编号在整个文档中单调递增。默认按 Word 文本节点（`<w:t>`）处理；
+若敏感值被 Word 拆到多个 run（如“邮箱 alice.”与“wang@…”分属两段），
+请加 `--whole-paragraph`（会把段落格式并入首个 run，输出前用 Word 抽查）。
 涉密/合规场景请抽样核对后再使用。
 
 ## 快速开始

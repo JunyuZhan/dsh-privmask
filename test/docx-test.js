@@ -31,3 +31,26 @@ test('docx：正文 <w:t> 脱敏且保留格式结构', () => {
   const media = parseZip(buffer).find((e) => e.name === 'word/media/image1.png')
   if (!media || media.data.toString('utf8') !== 'not-really-png') throw new Error('非文本条目被改动')
 })
+
+test('docx：整段合并识别跨 run 敏感值（可选）且编号单调', () => {
+  const documentXml =
+    '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'
+    + '<w:p><w:r><w:t>邮箱 alice.</w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:t>wang@privmask-test.com</w:t></w:r></w:p>'
+    + '<w:p><w:r><w:t>备用 bob@privmask-test.com</w:t></w:r></w:p>'
+    + '</w:body></w:document>'
+  const entries = [
+    { name: '[Content_Types].xml', method: 8, data: Buffer.from('<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>') },
+    { name: 'word/document.xml', method: 8, data: Buffer.from(documentXml) },
+  ]
+  const input = writeZip(entries)
+  const { buffer, stats } = redactDocx(input, {}, { wholeParagraph: true })
+  const xml = parseZip(buffer).find((e) => e.name === 'word/document.xml').data.toString('utf8')
+  if (xml.includes('alice.') || xml.includes('bob@privmask-test.com')) throw new Error('跨 run 邮箱未遮罩: ' + xml)
+  if (!xml.includes('[REDACTED_EMAIL_1]') || !xml.includes('[REDACTED_EMAIL_2]')) {
+    throw new Error('编号未单调递增: ' + xml)
+  }
+  const runs = (xml.match(/<w:r>/g) || []).length + (xml.match(/<w:r><w:rPr>/g) || []).length
+  if (runs < 3) throw new Error('run 结构被合并删除: ' + xml)
+  if (!xml.includes('<w:b/>')) throw new Error('后续 run 格式样式丢失: ' + xml)
+  if (!stats.wholeParagraphs || stats.wholeParagraphs < 1) throw new Error('整段合并统计缺失')
+})
