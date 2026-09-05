@@ -11,11 +11,21 @@ import { redactDocx } from '../lib/docx.js'
 
 const args = process.argv.slice(2)
 const wholeParagraph = args.includes('--whole-paragraph')
-const positional = args.filter((a) => !a.startsWith('--'))
+const configIdx = args.indexOf('--config')
+let config = {}
+if (configIdx >= 0) {
+  const file = args[configIdx + 1]
+  if (!file) {
+    console.error('用法：--config <配置文件.json>（可选，键同 README 配置表）')
+    process.exit(2)
+  }
+  config = JSON.parse(await readFile(resolve(file), 'utf8'))
+}
+const positional = args.filter((a, i) => !a.startsWith('--') && i !== configIdx + 1)
 const inputArg = positional[0]
 const outputArg = positional[1]
 if (!inputArg) {
-  console.error('用法：node tools/redact-docx.mjs <输入.docx> [输出.docx] [--whole-paragraph]')
+  console.error('用法：node tools/redact-docx.mjs <输入.docx> [输出.docx] [--whole-paragraph] [--config cfg.json]')
   process.exit(2)
 }
 
@@ -27,7 +37,7 @@ if (resolve(output) === input) {
 }
 
 const raw = await readFile(input)
-const { buffer, stats } = redactDocx(raw, {}, { wholeParagraph })
+const { buffer, stats } = redactDocx(raw, config, { wholeParagraph })
 await writeFile(output, buffer)
 const summary = Object.entries(stats.counts).map(([k, v]) => k + '=' + v).join(', ')
 console.log('已生成脱敏副本：' + output)

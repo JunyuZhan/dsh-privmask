@@ -54,3 +54,17 @@ test('docx：整段合并识别跨 run 敏感值（可选）且编号单调', ()
   if (!xml.includes('<w:b/>')) throw new Error('后续 run 格式样式丢失: ' + xml)
   if (!stats.wholeParagraphs || stats.wholeParagraphs < 1) throw new Error('整段合并统计缺失')
 })
+
+test('docx：配置化——关闭姓名脱敏时保留姓名但仍遮邮箱', () => {
+  const xml = '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'
+    + '<w:p><w:r><w:t>原告张三，邮箱 bob@privmask-test.com</w:t></w:r></w:p></w:body></w:document>'
+  const input = writeZip([
+    { name: '[Content_Types].xml', method: 8, data: Buffer.from('<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>') },
+    { name: 'word/document.xml', method: 8, data: Buffer.from(xml) },
+  ])
+  const { buffer } = redactDocx(input, { redactNames: false })
+  const out = parseZip(buffer).find((e) => e.name === 'word/document.xml').data.toString('utf8')
+  if (!out.includes('张三') || !out.includes('[REDACTED_EMAIL_')) {
+    throw new Error('配置化脱敏未按预期生效: ' + out)
+  }
+})
