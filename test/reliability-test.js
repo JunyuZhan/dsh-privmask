@@ -5,6 +5,11 @@ import { createEngine } from '../lib/engine.js';
 import { restoreJson } from '../lib/restore.js';
 test('dsh-privmask reliability', async () => {
 
+// 隔离测试产物：egressAudit 默认开，把审计/诊断文件指到临时目录，避免污染真实 DSH_HOME
+const { mkdtempSync: testHomeTmp } = await import('node:fs');
+const { tmpdir: testHomeOs } = await import('node:os');
+process.env.DSH_HOME = testHomeTmp(testHomeOs() + '/privmask-test-home-');
+
 const cn = (...cps) => String.fromCharCode(...cps);
 const P = (cat, n) => '[REDACTED_' + cat + '_' + n + ']';
 const S = {
@@ -920,6 +925,47 @@ YH.setReply([
 ]);
 const y1 = await YH.dispatch(ymasked);
 t('Y1 早退路径仍还原回复', y1.includes(S.email) && !y1.includes('REDACTED_EMAIL_'), y1);
+
+// AA. 离境审计（egressAudit）：每笔 llm 请求的决策与媒体处置计数写入本地 JSONL
+const { readFileSync: auditRead, mkdtempSync: auditTmp } = await import('node:fs');
+const { join: auditJoin } = await import('node:path');
+const { tmpdir: auditOsTmp } = await import('node:os');
+const auditDirs = [];
+const runAudit = async (tag, config, content) => {
+  const dir = auditTmp(auditJoin(auditOsTmp(), 'privmask-audit-'));
+  auditDirs.push(dir);
+  const prevHome = process.env.DSH_HOME;
+  process.env.DSH_HOME = dir;
+  try {
+    const h = rawHarness({ egressAudit: true, logRedactions: false, ...config });
+    await h.run({ provider: 'p-' + tag, model: 'm', messages: [{ role: 'user', content }] });
+  } finally {
+    process.env.DSH_HOME = prevHome;
+  }
+};
+await runAudit('mask', {}, [{ type: 'text', text: '邮箱 ' + S.email }]);
+await runAudit('strip', {}, [{ type: 'image', image: mB64 }]);
+await runAudit('raw', { nonTextPolicy: 'allow', allowRawMedia: true }, [{ type: 'image', image: mB64 }]);
+await runAudit('block', { nonTextPolicy: 'block' }, [{ type: 'image', image: mB64 }]);
+await runAudit('pf', { preflightBase64: true }, [{ type: 'file', name: 'n.txt', content: mTextB64 }]);
+let aaLines = [];
+for (let i = 0; i < 100; i++) {
+  aaLines = [];
+  for (const dir of auditDirs) {
+    try {
+      const raw = auditRead(auditJoin(dir, 'privmask-egress.jsonl'), 'utf8');
+      aaLines.push(...raw.trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)));
+    } catch { /* 异步写入未完成，继续等 */ }
+  }
+  if (aaLines.length >= 5) break;
+  await new Promise((r) => setTimeout(r, 20));
+}
+const findAudit = (pred) => aaLines.find(pred);
+t('AA1 脱敏请求写审计-字段与类别计数', aaLines.length >= 5 && findAudit((l) => l.provider === 'p-mask' && l.decision === 'masked' && l.fields >= 1 && l.counts && l.counts.email >= 1 && l.rawMedia === false) !== undefined, JSON.stringify(aaLines).slice(0, 240));
+t('AA2 默认剥离图片块-审计 media.dropped', findAudit((l) => l.provider === 'p-strip' && l.decision === 'masked' && l.media && l.media.dropped >= 1) !== undefined, JSON.stringify(aaLines).slice(0, 240));
+t('AA3 allowRawMedia 原样透传-审计 rawMedia 标记', findAudit((l) => l.provider === 'p-raw' && l.decision === 'clean' && l.rawMedia === true && l.media.raw >= 1) !== undefined, JSON.stringify(aaLines).slice(0, 240));
+t('AA4 block 拦截-审计 decision=blocked', findAudit((l) => l.provider === 'p-block' && l.decision === 'blocked' && typeof l.reason === 'string' && l.reason.includes('非文本内容块')) !== undefined, JSON.stringify(aaLines).slice(0, 240));
+t('AA5 base64 预检放行-审计 media.preflight', findAudit((l) => l.provider === 'p-pf' && l.media && l.media.preflight >= 1) !== undefined, JSON.stringify(aaLines).slice(0, 240));
 
 // Z. 本地脱敏对照工具：原文 → 脱敏 → 还原 三份对照
 const { execSync } = await import('node:child_process');

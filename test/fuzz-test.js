@@ -5,7 +5,7 @@ test('dsh-privmask fuzz', async () => {
 let listener, received;
 const llmStub = { stream(o) { received = o; return (async function* () { yield { type: 'finish', reason: { kind: 'stop' } }; })(); } };
 const ctx = { on(n, f) { if (n === 'llm/stream') listener = f; return () => {}; }, get(n) { return n === 'llm' ? llmStub : undefined; } };
-apply(ctx, {});
+apply(ctx, { egressAudit: false });
 const POOL = ['a','b','0','9',' ','-','@','.','/',':','中','国','北','京','深','圳','张','三','李','四','王','五','元','电','话','邮','箱','信','用','卡','身','份','证','号','码','公','司','银','行','住','址','路','号','案','车','牌','' ];
 async function run(text) {
   received = null;

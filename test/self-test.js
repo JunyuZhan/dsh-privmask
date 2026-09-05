@@ -59,7 +59,7 @@ const ctx = {
 };
 
 // 全规则回归：默认隐私配置（姓名/公司/机关/地址/凭据/PII 均脱敏）
-apply(ctx, {});
+apply(ctx, { egressAudit: false });
 
 const options = {
   provider: 'test',

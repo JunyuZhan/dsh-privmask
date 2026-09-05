@@ -30,6 +30,8 @@ export interface Config {
   preserveValues?: string[];
   failClosed?: boolean;
   strictUnknown?: boolean;
+  /** 离境审计（默认 true）：每笔发往云端的 llm 请求写一行本地 JSONL（$DSH_HOME/privmask-egress.jsonl） */
+  egressAudit?: boolean;
   logRedactions?: boolean;
 }
 

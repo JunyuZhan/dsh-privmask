@@ -33,6 +33,7 @@ DeepSeek Harness 本地脱敏插件：在请求发往云端大模型之前，将
 - **日志脱敏**：用户输入（`agent/pre-step`）与工具结果（`tools/post-execute`）在写入会话日志前遮罩，原则上不落明文（dsh 个别内部事件会保留原文副本，见[已知限制](#已知限制)）；模型回复仍由入站还原为真值
 - **严格模式**：脱敏异常（failClosed）、未检查字段（strictUnknown）默认拒绝请求；非文本内容默认剥离（nonTextPolicy=strip），图片字节不出本地
 - **base64 文本预检**：开启 `preflightBase64` 后，携带 base64 载荷的媒体/文件块若可判定为 UTF-8 文本，会在本地解码、按同一套规则脱敏后回编码再上云；图片等二进制内容无法判定，仍走 `nonTextPolicy` 门禁
+- **离境审计**：每笔发往云端大模型的请求在本地追加一行 JSONL（默认开，可 `egressAudit: false` 关闭），记录决策（clean/masked/blocked/error）、脱敏字段与类别计数、媒体处置（剥离/预检/原样透传），`rawMedia: true` 即“有媒体原样离境”，可据此决定是否收紧配置
 - **隐私优先（默认）**：姓名、身份证、联系方式、地址、公司/单位名称等能唯一锁定对象的信息默认脱敏；案号、出生日期、涉案金额等公开可查或办案所需信息默认保留
 - **会话一致性**：同一会话内同一值跨请求映射到同一占位符，模型可跨轮关联实体；不同会话相互隔离
 - **类别化配置**：凭据 / 地址 / 姓名 / 公司 / 机关 / 案号 / 出生日期 分别开关，按场景组合
@@ -156,6 +157,7 @@ node tools/redact-text.mjs input.txt out.txt --config cfg.json
 | `dropSessionId` | `true` | 移除 `x-deepseek-harness-session-id` 请求头 |
 | `failClosed` | `true` | 严格模式：脱敏异常时拒绝请求，绝不把未脱敏数据发往云端 |
 | `strictUnknown` | `true` | 严格模式：发现未检查的未知字段（含嵌套的非普通对象，如 Buffer/类实例）时拒绝请求 |
+| `egressAudit` | `true` | 离境审计：每笔发往云端的 llm 请求写一行本地 JSONL（`$DSH_HOME/privmask-egress.jsonl`，超过 10MB 轮转为 `.1`）；只记决策与计数，不记消息原文 |
 | `logRedactions` | `true` | 每次脱敏打印一行统计日志 |
 
 ## 脱敏机制
@@ -234,7 +236,7 @@ node tools/redact-text.mjs input.txt out.txt --config cfg.json
 
 ```sh
 node test/self-test.js        # 14 项功能回归（端到端拦截 + 中文实体）
-node test/reliability-test.js # 157 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/base64文本预检/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/词表热更新/字符串 content 还原/出站脱敏）
+node test/reliability-test.js # 162 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/base64文本预检/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/词表热更新/字符串 content 还原/出站脱敏/离境审计）
 node test/accuracy-test.js    # 26 项准确性（法律文档矩阵/凭据/PII校验/证件与信用代码上下文/复姓/泛化机构与村镇/姓名标签边界/客户端版本一致性）
 node test/docx-test.js        # docx 本地脱敏（格式保留/非文本条目原样/占位符写入）
 node test/fuzz-test.js        # 300 例随机文本 × 2 断言（不崩 + 幂等，共 600 断言）

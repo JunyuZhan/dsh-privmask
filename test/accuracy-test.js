@@ -12,7 +12,7 @@ function makeHarness(config) {
     on(n, f) { if (n === 'llm/stream') listener = f; return () => {}; },
     get(n) { return n === 'llm' ? llmStub : undefined; },
   }
-  apply(ctx, config)
+  apply(ctx, { egressAudit: false, ...config })
   return {
     async dispatch(text) {
       received = null
@@ -53,7 +53,7 @@ test('还原往返：模型回显占位符 → 本地还原原值', async () => 
   let canned = []
   const ctx = { on(n, f) { if (n === 'agent/pre-step') preStep = f; else if (n === 'llm/stream') llmFn = f; return () => {} }, get(n) { return n === 'llm' ? llmStub : undefined } }
   let llmFn = null
-  apply(ctx, { logRedactions: false })
+  apply(ctx, { logRedactions: false, egressAudit: false })
   const d = await preStep({ agent: { session: { id: 'a' } }, messages: [] }, async () => ({ kind: 'enter', messages: [{ role: 'user', content: [{ type: 'text', text: '邮箱 test123@qq.com' }] }] }))
   const masked = d.messages[0].content[0].text
   const ph = masked.match(/\[REDACTED_[A-Z_]+_\d+\]/)[0]
@@ -869,7 +869,7 @@ test('strictUnknown：嵌套非普通对象拦截', async () => {
   let listener = null
   let received = null
   const ctx = { on(n, f) { if (n === 'llm/stream') listener = f; return () => {} }, get(n) { return n === 'llm' ? { stream() { return (async function* () {})() } } : undefined } }
-  apply(ctx, { logRedactions: false })
+  apply(ctx, { logRedactions: false, egressAudit: false })
   const opts = { provider: 't', model: 'm', messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }], extra: { buf: Buffer.from('sk-secret') } }
   const gen = listener(opts, () => { received = opts; return (async function* () { yield { type: 'finish', reason: { kind: 'stop' } }; })() })
   let reason = null
