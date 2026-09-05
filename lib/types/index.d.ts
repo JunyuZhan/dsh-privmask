@@ -32,6 +32,10 @@ export interface Config {
   strictUnknown?: boolean;
   /** 离境审计（默认 true）：每笔发往云端的 llm 请求写一行本地 JSONL（$DSH_HOME/privmask-egress.jsonl） */
   egressAudit?: boolean;
+  /** 本地 OCR 兜底（默认 false）：图片附件在本地转文本后再进脱敏/上云管线（依赖 ~/.ocr-tool） */
+  localOcr?: boolean;
+  /** 高级/测试：自定义 OCR 命令 argv；空则使用默认 ~/.ocr-tool/ocr.py */
+  localOcrCommand?: string[];
   logRedactions?: boolean;
 }
 

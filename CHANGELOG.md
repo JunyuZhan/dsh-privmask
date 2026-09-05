@@ -40,6 +40,17 @@
   `rawMedia: true` 标记“有媒体原样离境”，便于发现需要收紧 `nonTextPolicy`/`allowRawMedia` 的场景。
 - 可靠性测试 157 → 162（AA1-AA5：脱敏/剥离/原样透传/拦截/预检五类请求的审计行字段）。
 
+### 新功能（M3 图片侧：本地 OCR 兜底）
+
+- 新增 `localOcr`（默认 `false`）：启用后，在 llm 请求进入水瀑前先把 image 附件
+  用 `~/.ocr-tool`（与 dsh-image-text-fallback 相同的本地视觉服务）转成 OCR 文本，
+  OCR 文本随后走常规脱敏，图片字节不出本地；实现方式为包装 llm.stream/prepareCall/
+  resolveModelInfo，与 dsh-image-text-fallback 同构，两个插件同时存在时可叠加不冲突。
+- OCR 失败默认以“说明文本”替代图片继续请求；`nonTextPolicy: block` 时保留原块并整体拒绝；
+  失败占位中的本机路径会被净化，不把环境信息带上云。
+- 可靠性测试 162 → 167（AB1-AB4：图片 OCR 文本脱敏上云、工具结果内嵌图片、
+  OCR 失败说明文本/block 拒绝、纯文本模型能力上报软化）。
+
 ## [0.2.41] - 2026-09-05
 
 ### 修复（docx 工具）

@@ -967,6 +967,72 @@ t('AA3 allowRawMedia 原样透传-审计 rawMedia 标记', findAudit((l) => l.pr
 t('AA4 block 拦截-审计 decision=blocked', findAudit((l) => l.provider === 'p-block' && l.decision === 'blocked' && typeof l.reason === 'string' && l.reason.includes('非文本内容块')) !== undefined, JSON.stringify(aaLines).slice(0, 240));
 t('AA5 base64 预检放行-审计 media.preflight', findAudit((l) => l.provider === 'p-pf' && l.media && l.media.preflight >= 1) !== undefined, JSON.stringify(aaLines).slice(0, 240));
 
+// AB. 本地 OCR 兜底（localOcr，默认关）：图片附件在 llm 水瀑前转 OCR 文本，再走常规脱敏
+const { writeFileSync: ocrWrite, mkdtempSync: ocrTmp } = await import('node:fs');
+const ocrScriptDir = ocrTmp(auditJoin(auditOsTmp(), 'privmask-ocr-'));
+const ocrOkScript = auditJoin(ocrScriptDir, 'ok.mjs');
+ocrWrite(ocrOkScript, 'console.log(JSON.stringify({ ok: true, result: "原告张三，电话13800138000，邮箱 test123@qq.com。" }));\n');
+const ocrFailScript = auditJoin(ocrScriptDir, 'fail.mjs');
+ocrWrite(ocrFailScript, 'process.exit(2);\n');
+function ocrHarness(config, command) {
+  let llmHook = null;
+  let received = null;
+  const llmObj = {
+    async resolveModelInfo(provider, model) { return { provider, id: model, name: model, inputModalities: ['text'] }; },
+    stream(options) {
+      if (llmHook) {
+        return llmHook(options, () => {
+          received = options;
+          return (async function* () { yield { type: 'finish', reason: { kind: 'stop' } }; })();
+        });
+      }
+      received = options;
+      return (async function* () { yield { type: 'finish', reason: { kind: 'stop' } }; })();
+    },
+  };
+  const attachments = { readImage: async () => ({ data: Buffer.from('fake-image-bytes') }) };
+  const ctx = {
+    on(n, f) { if (n === 'llm/stream') llmHook = f; return () => {}; },
+    get(n) {
+      if (n === 'llm') return llmObj;
+      if (n === 'attachments') return attachments;
+      return undefined;
+    },
+    emit() {},
+  };
+  apply(ctx, { egressAudit: false, logRedactions: false, localOcr: true, localOcrCommand: command, ...config });
+  return {
+    async run(content) {
+      received = null;
+      const opts = { provider: 't', model: 'm', messages: [{ role: 'user', content }] };
+      const gen = llmObj.stream(opts);
+      const out = [];
+      for await (const c of gen) out.push(c);
+      return { received, out };
+    },
+    async resolve(provider, model) { return llmObj.resolveModelInfo(provider, model); },
+  };
+}
+const Ho1 = ocrHarness({}, [process.execPath, ocrOkScript]);
+const ab1 = await Ho1.run([{ type: 'text', text: '看这张图' }, { type: 'image', attachment: { attachmentId: 'att-ocr-1', mediaType: 'image/png' } }]);
+const ab1Text = ab1.received ? ab1.received.messages[0].content.map((b) => (b.type === 'text' ? b.text : b.type)).join('\n') : '';
+t('AB1 图片经本地OCR文本脱敏后上云', ab1.received !== null && ab1Text.includes('[REDACTED_NAME_') && ab1Text.includes('[REDACTED_MOBILE_') && !ab1Text.includes('张三') && !ab1Text.includes('13800138000') && !JSON.stringify(ab1.received).includes('att-ocr-1'), ab1Text.slice(0, 120));
+const Ho1b = ocrHarness({}, [process.execPath, ocrOkScript]);
+const ab1b = await Ho1b.run([{ type: 'tool-result', toolCallId: 'c1', content: [{ type: 'image', attachment: { attachmentId: 'att-ocr-2', mediaType: 'image/png' } }] }]);
+const ab1bText = ab1b.received ? JSON.stringify(ab1b.received.messages[0].content) : '';
+t('AB1b 工具结果内嵌图片同样OCR脱敏', ab1b.received !== null && ab1bText.includes('[REDACTED_EMAIL_') && !ab1bText.includes('att-ocr-2') && !ab1bText.includes('test123@qq.com'), ab1bText.slice(0, 140));
+const Ho2 = ocrHarness({}, [process.execPath, ocrFailScript]);
+const ab2 = await Ho2.run([{ type: 'image', attachment: { attachmentId: 'att-ocr-3', mediaType: 'image/png' } }]);
+const ab2Text = ab2.received ? ab2.received.messages[0].content.map((b) => (b.type === 'text' ? b.text : b.type)).join('') : '';
+t('AB2 OCR失败默认以说明文本替代不原样放行', ab2.received !== null && ab2.received.messages[0].content.length === 1 && ab2.received.messages[0].content[0].type === 'text' && ab2Text.includes('图片本地OCR不可用') && !JSON.stringify(ab2.received).includes('att-ocr-3'), ab2Text.slice(0, 120));
+const Ho3 = ocrHarness({ nonTextPolicy: 'block' }, [process.execPath, ocrFailScript]);
+const ab3 = await Ho3.run([{ type: 'image', attachment: { attachmentId: 'att-ocr-4', mediaType: 'image/png' } }]);
+const ab3Finish = ab3.out.find((c) => c.type === 'finish');
+t('AB3 OCR失败且block策略-整体拒绝', ab3.received === null && ab3Finish && ab3Finish.reason.kind === 'error' && ab3Finish.reason.failure.code === 'PRIVMASK_NON_TEXT_BLOCKED', JSON.stringify(ab3Finish && ab3Finish.reason));
+const Ho4 = ocrHarness({}, [process.execPath, ocrOkScript]);
+const ab4 = await Ho4.resolve('t', 'm');
+t('AB4 纯文本模型能力上报软化以放行图片检查', ab4 && ab4.inputModalities === undefined, JSON.stringify(ab4));
+
 // Z. 本地脱敏对照工具：原文 → 脱敏 → 还原 三份对照
 const { execSync } = await import('node:child_process');
 const { writeFileSync, mkdtempSync } = await import('node:fs');
