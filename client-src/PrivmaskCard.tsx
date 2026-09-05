@@ -285,6 +285,11 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
               {factsOn ? '关闭' : '全部开启'}
             </button>
           </div>
+          {switchRow('redactNames', '姓名')}
+          {switchRow('redactCompanies', '公司')}
+          {switchRow('redactOrgs', '机关')}
+          {switchRow('redactCaseNumbers', '案号')}
+          {switchRow('redactDob', '出生日期')}
           {switchRow('redactAddress', '地址')}
           {switchRow('redactCredentials', '密钥凭据')}
           <div style={body}>当前生效：{active.join('、') || '无'}；保留：{kept.join('、') || '无'}。</div>

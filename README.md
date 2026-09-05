@@ -98,6 +98,13 @@ node tools/redact-docx.mjs a.docx b.docx --out-dir out --report report.json  # �
 请加 `--whole-paragraph`（会把段落格式并入首个 run，输出前用 Word 抽查）。
 涉密/合规场景请抽样核对后再使用。
 
+纯文本（.txt/.md/导出文本）可用配套 CLI：
+
+```sh
+node tools/redact-text.mjs input.txt                # 生成 input.redacted.txt
+node tools/redact-text.mjs input.txt out.txt --config cfg.json
+```
+
 ## 快速开始
 
 默认配置即「隐私优先」：密钥凭据、地址、姓名、公司/单位名称与 PII 脱敏；案号、出生日期、涉案金额保留（公开可查或办案所需）。
