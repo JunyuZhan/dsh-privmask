@@ -145,7 +145,8 @@ node tools/redact-text.mjs input.txt out.txt --config cfg.json
 | `preserveValues` | `[]` | 白名单：命中规则的值也原样保留（标记放行误报） |
 | `strictId18` | `true` | 身份证 18 位严格校验：仅校验位合法的号码脱敏；关闭后日期段合理或带「身份证号」上下文的号码也脱敏 |
 | `restoreInbound` | `true` | 入站还原：云端返回的占位符在本地还原为原值（响应显示、工具执行），下次出站重新脱敏；历史展示层还原依赖 `persistMapping: true` |
-| `nonTextPolicy` | `strip` | 非文本内容策略：`strip`=移除后放行、`block`=拒绝请求、`allow`=原样透传 |
+| `nonTextPolicy` | `strip` | 非文本内容策略：`strip`=移除后放行、`block`=拒绝请求、`allow`=透传（0.2.41 起默认仍需 `allowRawMedia: true` 才真正放行） |
+| `allowRawMedia` | `false` | 显式承担风险后才允许图片/文件原样透传（默认 false：`allow` 也拒绝，先本地 OCR/脱敏再发送更符合“凡离境必先脱敏”） |
 | `longTokens` | `true` | 长 hex/base64 串脱敏 |
 | `redactToolMeta` | `true` | 工具描述/参数 schema 中的敏感信息脱敏（担心遮罩影响模型理解工具时可设 false） |
 | `redactPaths` | `false` | 绝对路径脱敏（开启会破坏文件工具的路径回传） |
@@ -206,7 +207,9 @@ node tools/redact-text.mjs input.txt out.txt --config cfg.json
 
 ## 已知限制
 
-- **仅文本脱敏**：图片/文件等非文本内容默认剥离（不发送），不进行 OCR 或像素级处理；若启用 DeepSeek 多模态直发图片，需显式设置 `nonTextPolicy: allow` 并自行评估风险。
+- **仅文本脱敏**：图片/文件等非文本内容默认剥离（不发送），不进行 OCR 或像素级处理；
+  若需多模态直发图片，仅设 `nonTextPolicy: allow` 已不足——还必须显式设置
+  `allowRawMedia: true` 承担原样发送风险（默认会拒绝，先本地 OCR/脱敏更符合目标）。
 - **启发式识别**：姓名/公司/地址等基于角色上下文、姓氏库与正则规则，复杂句式下可能漏检或误伤。
 - **自定义词表为精确子串匹配**：`customTerms` 中的词命中即脱敏，包含该词的长词同样命中（如词表含「张三」时「张三丰」也会被命中）；误报可用 `preserveValues` 标记放行。
 - **证件/信用代码校验**：带「身份证号/统一社会信用代码」等明确标注的号码**始终脱敏**（不依赖校验位）；
@@ -228,7 +231,7 @@ node tools/redact-text.mjs input.txt out.txt --config cfg.json
 
 ```sh
 node test/self-test.js        # 14 项功能回归（端到端拦截 + 中文实体）
-node test/reliability-test.js # 138 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/词表热更新/字符串 content 还原/出站脱敏）
+node test/reliability-test.js # 139 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/词表热更新/字符串 content 还原/出站脱敏）
 node test/accuracy-test.js    # 26 项准确性（法律文档矩阵/凭据/PII校验/证件与信用代码上下文/复姓/泛化机构与村镇/姓名标签边界/客户端版本一致性）
 node test/docx-test.js        # docx 本地脱敏（格式保留/非文本条目原样/占位符写入）
 node test/fuzz-test.js        # 300 例随机文本 × 2 断言（不崩 + 幂等，共 600 断言）

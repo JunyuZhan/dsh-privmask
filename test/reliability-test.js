@@ -244,7 +244,12 @@ const rs1 = await Hs.run([{ type: 'text', text: '描述图片' }, { type: 'image
 t('M4 strip-显式移除图片块只留文本', rs1.received !== null && rs1.received.messages[0].content.length === 1 && rs1.received.messages[0].content[0].type === 'text', JSON.stringify(rs1.received.messages[0].content));
 const Ha = imageHarness({ nonTextPolicy: 'allow' });
 const ra1 = await Ha.run([{ type: 'text', text: '描述图片' }, { type: 'image', image: mB64 }]);
-t('M5 allow-图片原样放行', ra1.received !== null && ra1.received.messages[0].content.length === 2, JSON.stringify(ra1.received.messages[0].content.map((b) => b.type)));
+t('M5 allow-默认拒绝原样透传（需先本地OCR/脱敏）', ra1.received === null && ra1.reason.kind === 'error'
+  && ra1.reason.failure.code === 'PRIVMASK_NON_TEXT_BLOCKED', JSON.stringify(ra1.reason));
+const Hraw = imageHarness({ nonTextPolicy: 'allow', allowRawMedia: true });
+const ra2 = await Hraw.run([{ type: 'text', text: '描述图片' }, { type: 'image', image: mB64 }]);
+t('M5b allowRawMedia=true 显式承担风险后放行', ra2.received !== null && ra2.received.messages[0].content.length === 2
+  && JSON.stringify(ra2.received).includes(mB64), JSON.stringify(ra2.received.messages[0].content.map((b) => b.type)));
 const rt1 = await Hi.run([{ type: 'tool-result', toolCallId: 'c1', content: [{ type: 'image', image: mB64 }] }]);
 t('M6 tool-result 内图片默认剥离', rt1.received !== null && !JSON.stringify(rt1.received).includes(mB64), JSON.stringify(rt1.received.messages[0].content));
 
