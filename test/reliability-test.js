@@ -1053,6 +1053,43 @@ ocrWrite(acFile2, JSON.stringify({ v: 1, ts: '2026-09-06T00:00:00.000Z', decisio
 const acRun2 = acSpawn(process.execPath, [auditCli, '--file', acFile2], { encoding: 'utf8' });
 t('AC2 审计摘要-无raw时正常退出0', acRun2.status === 0 && (acRun2.stdout || '').includes('dropped=1'), (acRun2.stdout || '') + (acRun2.stderr || ''));
 
+// AD. PDF 脱敏预检 CLI（tools/pdf-preflight.mjs）：文本层提取→脱敏→预览/报告（依赖 poppler，缺失时跳过）
+const pdfTool = acFileUrl(new URL('../tools/pdf-preflight.mjs', import.meta.url));
+const havePdftotextBin = acSpawn('pdftotext', ['-v']).status === 0;
+const adDir = auditTmp(auditJoin(auditOsTmp(), 'privmask-pdf-cli-'));
+const adPdf = auditJoin(adDir, 'sample.pdf');
+if (havePdftotextBin) {
+  const adContent = 'BT /F1 14 Tf 72 720 Td (Please contact 13800138000 or test123@qq.com.) Tj ET\n';
+  const adObjs = [
+    null,
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    '<< /Length ' + adContent.length + ' >>\nstream\n' + adContent + 'endstream',
+  ];
+  let adOut = '%PDF-1.4\n';
+  const adOffs = [];
+  for (let i = 1; i <= 5; i++) {
+    adOffs[i] = adOut.length;
+    adOut += i + ' 0 obj\n' + adObjs[i] + '\nendobj\n';
+  }
+  const adXref = adOut.length;
+  adOut += 'xref\n0 6\n0000000000 65535 f \n';
+  for (let i = 1; i <= 5; i++) adOut += String(adOffs[i]).padStart(10, '0') + ' 00000 n \n';
+  adOut += 'trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n' + adXref + '\n%%EOF\n';
+  ocrWrite(adPdf, adOut);
+}
+const adRun = acSpawn(process.execPath, [pdfTool, adPdf, '--out-dir', adDir, '--report', auditJoin(adDir, 'report.json')], { encoding: 'utf8' });
+const adPreview = (() => {
+  try { return auditRead(auditJoin(adDir, 'sample.redacted.txt'), 'utf8'); } catch { return ''; }
+})();
+const adReport = (() => {
+  try { return JSON.parse(auditRead(auditJoin(adDir, 'report.json'), 'utf8')); } catch { return null; }
+})();
+t('AD1 PDF文本层脱敏预览-命中且原文不出', !havePdftotextBin || (adRun.status === 0 && adPreview.includes('[REDACTED_MOBILE_') && adPreview.includes('[REDACTED_EMAIL_') && !adPreview.includes('13800138000') && !adPreview.includes('test123@qq.com')), (adRun.stdout || '') + (adRun.stderr || '') + adPreview.slice(0, 200));
+t('AD2 PDF预检报告-页级统计', !havePdftotextBin || (adReport !== null && adReport.totals.redactedPages === 1 && adReport.files[0].pages[0].counts.mobile === 1 && adReport.files[0].pages[0].counts.email === 1), JSON.stringify(adReport || (adRun.stderr || '')).slice(0, 240));
+
 // Z. 本地脱敏对照工具：原文 → 脱敏 → 还原 三份对照
 const { execSync } = await import('node:child_process');
 const { writeFileSync, mkdtempSync } = await import('node:fs');
