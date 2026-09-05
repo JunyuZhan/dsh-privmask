@@ -3,6 +3,17 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.39] - 2026-09-05
+
+### 新功能：docx 本地脱敏（MVP）
+
+- 新增纯本地 docx 脱敏（lib/docx.js + tools/redact-docx.mjs）：
+  - 只改写正文/页眉页脚/脚注/批注里的 Word 文本节点，样式、媒体、关系等原样保留；
+  - 输出“脱敏副本”，不修改原文件；
+  - 零第三方依赖（Node 内置 zlib + 手工 zip/crc32）。
+- 已知边界：不跨 Word 文本分段识别被拆开的敏感值（工具与 README 均已注明）。
+- 新增 test/docx-test.js，并接入 CI 与 prepublishOnly；npm 包 files 增加 tools/。
+
 ## [0.2.38] - 2026-09-05
 
 ### 界面与策略

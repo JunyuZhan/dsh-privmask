@@ -81,6 +81,18 @@ npm install dsh-privmask
   headless/其它 profile 使用同一套 host 规则与配置文件（`$DSH_HOME/profiles/<name>/cordis.patch.yml`），
   展示层还原、运行时开关等浏览器能力自动降级。
 
+### docx 脱敏工具（本地 CLI，0.2.39+）
+
+纯本地、保留原格式，输出“脱敏副本”，不修改原文件：
+
+```sh
+node tools/redact-docx.mjs input.docx                # 生成 input.redacted.docx
+node tools/redact-docx.mjs input.docx output.docx    # 指定输出路径
+```
+
+已知边界：按 Word 文本节点（`<w:t>`）处理，不跨分段识别被拆开的敏感值；
+涉密/合规场景请抽样核对后再使用。
+
 ## 快速开始
 
 默认配置即「隐私优先」：密钥凭据、地址、姓名、公司/单位名称与 PII 脱敏；案号、出生日期、涉案金额保留（公开可查或办案所需）。
@@ -195,9 +207,9 @@ npm install dsh-privmask
 - **`agent/inbox/spliced` 事件保留用户消息原文**：dsh 在用户消息进入 inbox 队列时以原文落盘该会话事件，该事件早于 `agent/pre-step` 且无插件改写缝（`session/event` 为只读观察），privmask 无法遮罩这一份日志副本；模型上下文与出站请求仍使用遮罩后的 `user/message`，不受影响。
 - **`nonTextPolicy: block` 时用户消息会被整体拒绝**：图片/文件块在 `agent/pre-step` 即触发步骤拒绝（`reject`），不写入日志也不上云。
 - **内存映射**：占位符映射仅存于内存，进程重启后会话内映射即失效；单类别超过 2000 个不同值后最旧映射被逐出（编号不复用），被逐出的旧占位符不再还原；引擎另有 200 个会话上限（超限淘汰最旧会话），极端规模下内存占用可能仍较大；云端侧不可逆，无法还原。
-- **仅处理文本/文本块**：本插件目前只对对话文本、工具文本与文本型附件内容做脱敏；
-  Word/PDF/图片等文件内容不在当前版本处理范围内。相关能力（docx/pdf 文本抽取回写、OCR 后遮罩）
-  属规划中的独立功能，为避免“看似支持实则不遮”的误判，未内置前不会声明支持。
+- **仅处理文本/文本块（对话与 docx 文本层）**：对话、工具文本在出站前脱敏；
+  docx 自 0.2.39 起提供本地文本层脱敏工具（不跨分段识别，见上方说明）；
+  PDF 与图片（OCR 后遮罩）仍属规划中的独立能力，未内置前不声明支持。
 
 ## 测试与 CI
 
@@ -205,6 +217,7 @@ npm install dsh-privmask
 node test/self-test.js        # 14 项功能回归（端到端拦截 + 中文实体）
 node test/reliability-test.js # 138 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/词表热更新/字符串 content 还原/出站脱敏）
 node test/accuracy-test.js    # 26 项准确性（法律文档矩阵/凭据/PII校验/证件与信用代码上下文/复姓/泛化机构与村镇/姓名标签边界/客户端版本一致性）
+node test/docx-test.js        # docx 本地脱敏（格式保留/非文本条目原样/占位符写入）
 node test/fuzz-test.js        # 300 例随机文本 × 2 断言（不崩 + 幂等，共 600 断言）
 ```
 

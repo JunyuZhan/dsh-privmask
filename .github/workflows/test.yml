@@ -18,3 +18,4 @@ jobs:
       - run: node test/accuracy-test.js
       - run: node test/reliability-test.js
       - run: node test/fuzz-test.js
+      - run: node test/docx-test.js
