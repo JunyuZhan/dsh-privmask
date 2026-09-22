@@ -1096,6 +1096,23 @@ const ag4 = await Ho5.run([{ type: 'image', attachment: { attachmentId: 'att-ocr
 const ag4Text = ag4.received ? ag4.received.messages[0].content.map((b) => (b.type === 'text' ? b.text : b.type)).join('') : '';
 t('AG4 OCR 失败文本剥离 Windows/POSIX 路径', ag4Text.includes('图片本地OCR不可用') && !ag4Text.includes('C:\\Users') && !ag4Text.includes('/Users/apple'), ag4Text.slice(0, 160));
 
+// AH. 病理输入时间上限：规则全是正则，最怕回溯爆炸；把最坏形态的耗时钉住（阈值放宽到 5s 供 CI 用）
+const AH = makeHarness({ logRedactions: false });
+const ahCases = [
+  ['长汉字无分隔', '张'.repeat(200000)],
+  ['区县连环', '市区县镇乡村'.repeat(20000)],
+  ['地址上下文连环', '住址：'.repeat(20000)],
+  ['公司后缀连环', '有限公司'.repeat(25000)],
+  ['括号嵌套', '（'.repeat(50000) + '）'.repeat(50000)],
+  ['姓名上下文连环', '原告被告第三人'.repeat(15000)],
+];
+for (const [ahName, ahText] of ahCases) {
+  const ahT0 = Date.now();
+  await AH.dispatch(ahText);
+  const ahMs = Date.now() - ahT0;
+  t('AH 病理输入时间上限：' + ahName, ahMs < 5000, ahMs + 'ms / ' + ahText.length + ' 字符');
+}
+
 // AC. 审计摘要 CLI（tools/audit-summary.mjs）：汇总/告警/损坏行容错/退出码
 const { spawnSync: acSpawn } = await import('node:child_process');
 const { fileURLToPath: acFileUrl } = await import('node:url');
