@@ -72,11 +72,11 @@ const disclaimerBox: React.CSSProperties = {
   background: 'rgba(229, 72, 77, .06)',
 }
 /** 插件适配的 dsh 宿主范围（与 README 一致；功能随宿主能力自动降级） */
-export const DSH_SUPPORT = 'dsh 0.1.0-rc.6+（官方 npm）与 0.1.2 开发线'
+export const DSH_SUPPORT = 'dsh 0.1.0-rc.6+（0.1.1-rc.2 / 0.1.5-rc.2 / 0.1.6-alpha.2 已实测核对）'
 /** 免责声明（完整版见 README「责任与边界」） */
 export const DISCLAIMER = '脱敏为启发式本地处理，无法保证零漏检；重要数据请自行评估并保留原文。'
 /** 插件版本（与 package.json 同步；accuracy 测试强制一致，避免发版漂移） */
-export const PLUGIN_VERSION = '0.2.42'
+export const PLUGIN_VERSION = '0.2.43'
 
 export function PrivmaskCard(props: PrivmaskCardInjected) {
   const [enabled, setEnabled] = useState<boolean | null>(null)
@@ -201,7 +201,8 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
 
   /** 复制更新命令到剪贴板（clipboard API，带 textarea 兜底） */
   const copyUpdateCommand = () => {
-    const cmd = 'dsh plugin --profile web update dsh-privmask'
+    // 不写死 web：desktop 等 profile 同样适用（issue #1）
+    const cmd = 'dsh plugin --profile <profile> update dsh-privmask'
     const done = () => {
       setCopied(true)
       setTimeout(() => setCopied(false), 3000)
@@ -310,7 +311,7 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
             </div>
             {switchRow('redactNames', '姓名')}
             {switchRow('redactCompanies', '公司')}
-            {switchRow('redactOrgs', '机关')}
+            {switchRow('redactOrgs', '机关（法院除外）')}
             {switchRow('redactAddress', '地址')}
             {switchRow('redactCredentials', '密钥凭据')}
             <div style={sectionSub}>默认保留项（开启后改为脱敏）</div>

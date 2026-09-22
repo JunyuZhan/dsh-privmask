@@ -24,7 +24,7 @@ DeepSeek Harness 本地脱敏插件：在请求发往云端大模型之前，将
 
 ## 特性
 
-- **出站脱敏**：PEM/JWT/API Key、Bearer/Authorization、邮箱、电话、IPv4/IPv6、身份证（18/15 位）、统一社会信用代码、手机/座机、银行卡（Luhn 校验）、案号、车牌、护照/证件、微信号/QQ 号/律师执业证号（上下文识别）、出生日期、地址、公司名、司法机关
+- **出站脱敏**：PEM/JWT/API Key、Bearer/Authorization、邮箱、电话、IPv4/IPv6、身份证（18/15 位）、统一社会信用代码、手机/座机、银行卡（Luhn 校验）、案号、车牌、护照/证件、微信号/QQ 号/律师执业证号（上下文识别）、出生日期、地址、公司名、检察机关/公安等机关（**法院/法庭名称默认保留**）
 - **入站还原**：模型输出文本与工具调用参数中的占位符在本地还原为原值；用户消息在日志中为占位符、经展示层（`sessionController.page/follow`，服务可见时）还原为原文显示，模型回复与工具调用参数以真值显示并落盘；还原值再次出站时重新脱敏，云端始终只看到占位符
 - **流式重组**：占位符被网络切分到多个 delta 时，尾部缓冲跨分片还原，流式显示不残留前缀；还原未命中（映射被逐出/模型改写）有统计与日志可见
 - **全面脱敏档**：隐私保护卡片可一键开启「全面脱敏（姓名/公司/机关）」，涉案金额、日期、案号仍保留（便于金额核算与时效判断）
@@ -57,6 +57,30 @@ dsh plugin --profile web add dsh-privmask
 
 包通过 `dsh.bundle` 声明自动挂载到 profile 层栈，安装后重启 `dsh web` 生效。
 
+DSH Desktop（`desktop` profile）同理，把 `web` 换成 `desktop` 即可：
+
+```sh
+dsh plugin --profile desktop add dsh-privmask
+```
+
+`desktop` 下卡片出现在「设置 → 插件」的页签里（0.2.43 起；此前因客户端硬依赖
+宿主不存在的 `remote.pluginInventory` 而停在 PENDING，见
+[issue #2](https://github.com/JunyuZhan/dsh-privmask/issues/2)）。
+若该宿主没有客户端设置界面，则用配置文件模式：
+
+```yaml
+# $DSH_HOME/profiles/desktop/cordis.patch.yml
+- id: privmask
+  config:
+    enabled: true
+    redactNames: true
+    redactCompanies: true
+    redactOrgs: true
+    redactAddress: true
+    redactCredentials: true
+    customTerms: [张三, 某某公司]
+```
+
 升级与卸载：
 
 ```sh
@@ -64,11 +88,13 @@ dsh plugin --profile web update dsh-privmask
 dsh plugin --profile web remove dsh-privmask
 ```
 
-> **兼容性**：0.2.27 起浏览器端同时适配官方 npm 包
-> （`@deepseek-ai/dsh` 0.1.0-rc.6 / 0.1.1-rc.2，即 `npx @deepseek-ai/dsh web` 安装的版本）
-> 与 0.1.2-alpha.1 开发线。run_code 子派发日志遮罩仅在宿主提供
-> `tools/ptc-dispatch-log`（dsh ≥ 0.1.2）时自动启用，旧官方版无此事件属宿主能力差异，
-> 核心出站脱敏与卡片开关在两线上均可用。
+> **兼容性**：0.2.43 起按 `npm run dsh:compat` 实测核对过的宿主版本为
+> `@deepseek-ai/dsh` 0.1.0-rc.6 / 0.1.1-rc.2（旧官方线）、0.1.5-rc.2（当前 latest）
+> 与 0.1.6-alpha.2（alpha）；
+> 核心出站脱敏、落盘遮罩、设置开关在各线上均可用。run_code 子派发日志遮罩仅在宿主提供
+> `tools/ptc-dispatch-log`（dsh ≥ 0.1.2）时自动启用，旧官方版无此事件属宿主能力差异；
+> 客户端模块依赖里 `@deepseek-ai/dsh-client-runtime` 自 0.1.2 起已不存在（后继为
+> `@deepseek-ai/dsh-client-modules`），该条目在新版按未知依赖跳过，卡片仍正常加载。
 
 ### 通过 npm
 
@@ -80,7 +106,7 @@ npm install dsh-privmask
 
 - **Node 版本**：声明 `>=18`，CI 在 Node 18/20/22 运行，本仓库同时在 Node 24 手工验证。
 - **官方包与开发线**：浏览器端同时适配官方 npm `@deepseek-ai/dsh`
-  （0.1.0-rc.6 / 0.1.1-rc.2）与 0.1.2-alpha.1 开发线；若默认 registry 是镜像源且新版本未同步，
+  （0.1.0-rc.6 / 0.1.1-rc.2 旧线，与 0.1.5-rc.2 当前 latest）；若默认 registry 是镜像源且新版本未同步，
   更新时可显式指定官方源：`dsh plugin --profile web update dsh-privmask --registry=https://registry.npmjs.org`。
 - **“Already up to date”或安装报“最小发布期”**：pnpm 11 供应链策略会拦截刚发布（未过发布期）的版本，
   把对应版本加入 profile 的 `pnpm-workspace.yaml` 白名单即可：
@@ -88,8 +114,11 @@ npm install dsh-privmask
 - **更新后必须重启**：`dsh plugin ... update` 只替换包文件，运行中的进程仍加载旧代码；
   重启后访问令牌会变化（dsh web 每次启动打印新地址），后台服务（如 LaunchAgent）请用
   `launchctl bootout/bootstrap` 重启，再打开启动日志末尾打印的带 token 地址。
-- **profile 差异**：隐私保护卡片只在 `web` profile 的“设置 → 插件”里出现；
-  headless/其它 profile 使用同一套 host 规则与配置文件（`$DSH_HOME/profiles/<name>/cordis.patch.yml`），
+- **profile 差异**：隐私保护卡片出现在任何提供 `slots` / `locale` / `settingsScope` 的客户端运行时里
+  （`web` profile，以及 DSH Desktop 的 `desktop` profile；后者 0.2.43 起可用，见
+  [issue #2](https://github.com/JunyuZhan/dsh-privmask/issues/2) 的根因修复）；
+  headless/无客户端界面的 profile 使用同一套 host 规则与配置文件
+  （`$DSH_HOME/profiles/<name>/cordis.patch.yml`），
   展示层还原、运行时开关等浏览器能力自动降级。
 
 ### docx 脱敏工具（本地 CLI，0.2.39+）
@@ -149,7 +178,7 @@ node tools/redact-text.mjs input.txt out.txt --config cfg.json
 | `redactAddress` | `true` | 地址类脱敏：省市区乡、住址、户籍地、送达地址等 |
 | `redactNames` | `true` | 姓名脱敏：姓名是能唯一锁定当事人的信息 |
 | `redactCompanies` | `true` | 公司名称脱敏：法人唯一标识 |
-| `redactOrgs` | `true` | 机关/单位名称脱敏 |
+| `redactOrgs` | `true` | 机关/单位名称脱敏；**法院/法庭名称默认保留**（公开审判机关名，且案号代字已写明法院；确需遮罩某个法院时把它的全称加入 `customTerms`） |
 | `redactCaseNumbers` | `false` | 案号脱敏：默认保留（公开案件标识，管辖/关联判断需要真值） |
 | `redactDob` | `false` | 出生日期脱敏：默认保留（非唯一信息，年龄/时效计算需要真值） |
 | `customTerms` | `[]` | 自定义敏感词表：精确子串匹配即脱敏，不受角色上下文限制（当事人姓名/别名/机构简称）；面板输入框支持用分号/逗号/顿号分隔一次添加多个 |
@@ -194,6 +223,7 @@ node tools/redact-text.mjs input.txt out.txt --config cfg.json
 | 地址（省市区乡/住址） | 脱敏 | 当事人隐私核心；起草文书时由入站还原写回真值 |
 | 姓名 | 脱敏 | 能唯一锁定当事人的信息 |
 | 公司/单位名称 | 脱敏 | 法人/单位唯一标识 |
+| 法院/法庭名称 | 保留 | 公开审判机关名，不指向自然人；案号里的法院代字本就写明法院（脱了等于白脱），且管辖判断与「此致 XX 法院」起草需要真值。确需遮罩时把法院全称加入 `customTerms`（自定义词表优先于内置规则） |
 | 案号 | 保留 | 公开案件标识，不指向个人；管辖/关联判断需要真值 |
 | 出生日期 | 保留 | 非唯一信息；年龄/时效计算需要真值 |
 | 涉案金额 | 保留 | 诉讼费、违约金、利息计算依赖金额 |
@@ -212,13 +242,24 @@ node tools/redact-text.mjs input.txt out.txt --config cfg.json
 
 ## 版本适配与升级策略
 
-- 浏览器端适配：官方 npm `@deepseek-ai/dsh` 0.1.0-rc.6 / 0.1.1-rc.2 与 0.1.2-alpha.1 开发线；
-  隐私保护卡片会标注当前适配范围。
+- **已实测核对的宿主版本**：0.1.1-rc.2（旧官方线）、0.1.5-rc.2（当前 latest）与 0.1.6-alpha.2（alpha）。
+  核对方式是 `npm run dsh:compat`：按版本下载缝所在包到本机 `.dsh-versions/`
+  （已 gitignore，只留存不提交），逐个断言缝仍存在并打印「版本 × 缝」矩阵，
+  必需缝缺失即退出码 1；同一份缓存也可直接解两个版本做 diff。
+- **0.1.5-rc.2 / 0.1.6-alpha.2 核对结论**：`llm/stream`、`prepareCall`、`resolveModelInfo`、`agent/pre-step`、
+  `tools/post-execute`、`tools/ptc-dispatch-log`、`settings.register`、`attachments.readImage`、
+  `x-deepseek-harness-session-id` 全部仍在且签名兼容；`GenerateOptions` 全 12 个字段
+  （含 `reasoningEffort` / `temperature` / `maxTokens` / `stop` / `purpose`，0.1.1 起即存在）
+  被脱敏管线原样保留，
+  其中 `stop` 内的敏感值与消息共用同一占位符（模型只见占位符，停止串必须同步改写才匹配得上），
+  回归见可靠性测试 AF1-AF5。
 - 插件对 dsh 内部能力采用**软探测/自动降级**：不存在的宿主事件（如旧版没有
   `tools/ptc-dispatch-log`）不注册不报错；设置、展示层等服务不可见时退化为配置文件模式。
-- manifest 依赖行只保留各版本模块表都存在的公共模块，并有自动化回归防止误加回版本专属依赖。
-- **dsh 升级建议**：升级宿主前先跑仓库四套测试；若 dsh 客户端模块表/事件名发生变化，
-  优先检查卡片是否正常出现、控制台是否有 `展示层还原未安装` 类告警，再按告警决定是否等新版本插件。
+- manifest 依赖行只保留各版本模块表都存在的公共模块，并有自动化回归防止误加回版本专属依赖；
+  `dsh.client.inject` 里已不存在的条目由 `npm run dsh:compat` 显式列出（宿主按未知条目跳过）。
+- **dsh 升级建议**：升级宿主前先跑 `npm run dsh:compat <新版本>` 看缝是否还齐，
+  再跑仓库四套测试；若 dsh 客户端模块表/事件名发生变化，优先检查卡片是否正常出现、
+  控制台是否有 `展示层还原未安装` 类告警，再按告警决定是否等新版本插件。
 
 ## 已知限制
 
@@ -249,14 +290,21 @@ node tools/redact-text.mjs input.txt out.txt --config cfg.json
 ## 测试与 CI
 
 ```sh
-node test/self-test.js        # 14 项功能回归（端到端拦截 + 中文实体）
-node test/reliability-test.js # 173 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/base64文本预检/本地OCR兜底/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/词表热更新/字符串 content 还原/出站脱敏/离境审计/审计摘要CLI/PDF预检CLI/PDF覆写脱敏）
+node test/self-test.js        # 15 项功能回归（端到端拦截 + 中文实体 + 法院保留/检察机关脱敏）
+node test/reliability-test.js # 180 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/base64文本预检/本地OCR兜底/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/词表热更新/字符串 content 还原/出站脱敏/离境审计/审计摘要CLI/PDF预检CLI/PDF覆写脱敏/dsh0.1.5请求形态）
 node test/accuracy-test.js    # 26 项准确性（法律文档矩阵/凭据/PII校验/证件与信用代码上下文/复姓/泛化机构与村镇/姓名标签边界/客户端版本一致性）
 node test/docx-test.js        # docx 本地脱敏（格式保留/非文本条目原样/占位符写入）
 node test/fuzz-test.js        # 300 例随机文本 × 2 断言（不崩 + 幂等，共 600 断言）
 ```
 
 CI（GitHub Actions，Node 18/20/22）在每次 push / PR 时自动运行全部测试（`node:test` 结构化报告）。
+
+宿主适配自检（需要联网，不进 `prepublishOnly`，避免破坏离线发布）：
+
+```sh
+npm run dsh:compat                 # 核对 0.1.1-rc.2 与 0.1.5-rc.2
+npm run dsh:compat -- 0.1.6-alpha.2   # 核对指定版本（已核对，结论同上）
+```
 
 ## 诊断与统计
 

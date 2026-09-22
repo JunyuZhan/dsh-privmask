@@ -27,8 +27,11 @@ const en: Record<string, string> = {
  * 只声明官方 dsh（0.1.0-rc.6 / 0.1.1-rc.2）与 0.1.2-alpha.1 开发线都提供的服务：
  * `settingsScope` 是两线共有的命名空间作用域服务（由 dsh-client-ui-settings 提供），
  * 取代 0.1.2 才引入的 `remote.settings`，保证旧官方包不因缺失服务停在 PENDING。
+ * `remote.pluginInventory` **不能**写进这份清单：DSH Desktop（desktop profile）的客户端运行时
+ * 没有该服务，硬声明会让整个模块停在 PENDING、卡片永不注册（issue #2）。它是可选依赖，
+ * 改为下面按能力软注入，拿不到时卡片降级为「插件状态未知」。
  */
-export const inject = ['slots', 'locale', 'remote', 'remote.pluginInventory', 'settingsScope']
+export const inject = ['slots', 'locale', 'settingsScope']
 
 /** 注册隐私保护卡片到 设置→插件 页签。 */
 export function apply(ctx: ClientContext): void {
@@ -42,13 +45,35 @@ export function apply(ctx: ClientContext): void {
     }
   }
 
-  const remote = (ctx as unknown as {
-    remote: {
-      pluginInventory: {
-        list(): Promise<{ ok: boolean; value: unknown; error?: { message: string } }>
-      }
+  /**
+   * 插件清单（可选依赖，软注入）：只有宿主提供 `remote.pluginInventory` 时才取用。
+   * web profile 下用它显示「插件已启用/未启用」；desktop 等无该服务的宿主保持 undefined，
+   * `list()` 抛错后卡片显示「插件状态未知」，其余开关走 settingsScope 不受影响。
+   */
+  type PluginInventory = {
+    list(): Promise<{ ok: boolean; value: unknown; error?: { message: string } }>
+  }
+  let inventory: PluginInventory | undefined
+  // cordis 的软注入回调是异步落地的，而卡片挂载时就会读 list()；
+  // 不等它落地就会误报「插件状态未知」（0.2.43 真机实测）。
+  const inventoryReady = new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, 2000)
+    try {
+      // 注意：必须把 `remote` 与 `remote.pluginInventory` 一起软注入——cordis 只允许访问
+      // 已注入的服务属性，只声明后者时 `sctx.remote` 仍会被拦下（真机实测）。
+      ctx.inject(['remote', 'remote.pluginInventory'], (sctx) => {
+        try {
+          const s = sctx as unknown as { remote?: { pluginInventory?: PluginInventory } }
+          if (typeof s.remote?.pluginInventory?.list === 'function') inventory = s.remote.pluginInventory
+        } catch { /* 该宿主未暴露 remote 命名空间 */ }
+        clearTimeout(timer)
+        resolve()
+      })
+    } catch {
+      clearTimeout(timer)
+      resolve()
     }
-  }).remote
+  })
 
   /** settingsScope 命名空间作用域：官方 0.1.0-rc.6+ 与 0.1.2 开发线通用。 */
   interface PrivmaskScopeSnapshot {
@@ -93,7 +118,11 @@ export function apply(ctx: ClientContext): void {
   }
 
   const list: PrivmaskCardInjected['list'] = async () => {
-    const result = await remote.pluginInventory.list()
+    await inventoryReady
+    if (inventory === undefined) {
+      throw new Error('宿主未提供 remote.pluginInventory（desktop 等宿主无此服务）：插件状态未知，开关仍可用')
+    }
+    const result = await inventory.list()
     if (!result.ok) {
       throw new Error(`pluginInventory.list failed: ${String(result.error?.message ?? 'unknown')}`)
     }

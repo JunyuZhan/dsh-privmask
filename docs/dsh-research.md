@@ -85,6 +85,68 @@
 - 若 dsh 新版本改了 `llm/stream` 载荷形状，privmask 的 fail-closed 守卫会先给出明确
   错误而不是静默透传（已覆盖 messages 非数组、非文本策略、超长 ASCII 等）。
 
+## 5.1 0.1.5-rc.2 复核（2026-09-22）
+
+上游在 0.1.2-alpha.1 之后连发 0.1.2-rc.1 / 0.1.3-alpha.2 / 0.1.5-rc.2（当前 latest）
+与 0.1.6-alpha.2（alpha）。用 `npm run dsh:compat 0.1.5-rc.2 0.1.6-alpha.2` 拉下缝所在包
+逐条核对，两条线结论一致：**插件依赖的接口没有断**，逐项证据：
+
+| 缝 | 0.1.5-rc.2 证据 |
+|---|---|
+| `llm/stream` 水瀑 | `dsh-llm/lib/index.js`：`waterfall(this, "llm/stream", options, () => this.adapterStream(...))` |
+| 脱敏副本重入水瀑的前提 | `dsh-llm/lib/index.js`：`AGENT_LOOP_REQUESTS` WeakSet + `markAgentLoopRequest`；副本未标记，按对象身份判定，行为不变 |
+| 载荷投影时机 | `file`/`image` 投影成文本在 `adapterStream` 内（水瀑**之后**），因此 `nonTextPolicy` 仍决定媒体块处置——文件字节不会绕道明文上云 |
+| `llm.prepareCall` / `resolveModelInfo` | `dsh-llm/lib/index.js`（localOcr 的图片模态改写仍然有效） |
+| `agent/pre-step` | `dsh-agent/lib/types/runtime-types.d.ts`：`{ agent, messages, turn, step }` → `PreStepDecision{kind:'enter'|'reject'}` |
+| `tools/post-execute` | `dsh-tools/lib/index.js`：waterfall，`PostToolDecision{kind:'accept'|'block'}` |
+| `tools/ptc-dispatch-log` | `dsh-tools/lib/index.js`：`(dispatch, next) => ContentBlock[]` |
+| `settings.register` + `watch` | `dsh-settings/lib/index.js:281`、`types/index.d.ts:96` |
+| `attachments.readImage` | `dsh-attachment-local`：`readImage(ref, signal) => { ref, data: Uint8Array }` |
+| `x-deepseek-harness-session-id` | `dsh-llm-deepseek/lib/index.js:1666` |
+| 客户端 `settingsScope` / `pluginInventory` | `dsh-client-ui-settings/lib/client.js`、`dsh-api-remotes/lib/client.js`（namespace `pluginInventory`） |
+| 内容块词表 | `text/reasoning/image/file/tool-call/tool-result` 未变（`dsh-llm/lib/types/types.d.ts`） |
+| 展示层还原 | `session-controller` 仍排在 web-app bundle 的嵌套 include 里 → 对 profile 层插件仍不可达，降级声明继续成立 |
+
+宿主事件面（按各包 `lib/types/**/*.d.ts` 的 `interface Events` 声明口径）实测：
+0.1.1 有 25 个事件、0.1.5 与 0.1.6-alpha.2 各 26 个，三线共有 20 个；
+privmask 依赖的 `llm/stream`、`agent/pre-step`、`tools/post-execute` 三线都在，
+`tools/ptc-dispatch-log` 是 0.1.1 的 `tools/code-dispatch-log` 改名而来（旧线自动降级）。
+也就是说：**上游每 1-2 天发一版，但被我们押注的那几个缝一直没动**——
+紧跟版本号没有收益，定期跑一次核对就够。
+
+两个变化点值得记住：
+
+1. **`GenerateOptions` 的字段口径**：全 12 个字段（`reasoningEffort` / `temperature` / `maxTokens` /
+   `stop` / `purpose` 等）在 0.1.1 / 0.1.5 / 0.1.6-alpha.2 三线上**完全一致**。
+   privmask 的白名单外严格检查对它们走「原样保留基础类型、字符串/数组走脱敏」的兜底，
+   因此既不会触发 failClosed 也不会被吞掉；`stop` 里的敏感值与消息共用同一占位符
+   （模型只见占位符，停止串必须同步改写才匹配得上），回归见可靠性测试 AF1-AF5。
+2. **`@deepseek-ai/dsh-client-runtime` 消失了**（版本止于 0.1.1-rc.2），0.1.2 起由新增的
+   `@deepseek-ai/dsh-client-modules` 承担模块表职责。新模块表对**未知 inject 条目直接跳过**
+   （`dsh-client-modules/lib/client.js` 的 `arriveGraphRow`：`if (dependency !== void 0)`），
+   所以 privmask manifest 里保留旧条目不会让卡片停在 PENDING；`npm run dsh:compat` 会把
+   这类「声明了但该版本没有」的条目打印出来，避免声明悄悄腐烂。
+
+`agent/inbox/spliced` 落盘原文副本的已知限制在 0.1.5 依旧存在：该事件在
+`dsh-agent-loop` 内由 `session.append("agent/inbox/spliced", splice)` 写入，
+没有可改写的水瀑缝，privmask 仍无法遮罩这一份日志副本。
+
+### 5.2 浏览器端「可选依赖」怎么写（2026-09-22 真机实测）
+
+DSH Desktop（`desktop` profile）的客户端运行时没有 `remote.pluginInventory`，
+把它写进模块级 `inject` 会让整个客户端模块停在 PENDING——卡片永不注册
+（GitHub issue #2）。要按能力取用这种宿主专属服务，实测结论：
+
+1. 模块级 `inject` 只留**各宿主都提供**的服务（本插件：`slots` / `locale` / `settingsScope`）；
+2. 可选服务用 `ctx.inject([...], cb)` 软注入 —— **客户端 ctx 上确实有这个方法**；
+3. 嵌套服务要把父命名空间一起写：`ctx.inject(['remote','remote.pluginInventory'], cb)`。
+   只写 `'remote.pluginInventory'` 时回调仍会触发，但回调里 `sctx.remote` 会被 cordis
+   以 `cannot get property "remote" without inject` 拦下（真机探针验证）；
+4. 软注入回调是**异步**落地的，而卡片挂载即读服务，所以要 await 一个带超时的
+   ready promise（本插件 2 秒），否则会在 web 上误报「插件状态未知」；
+5. 宿主一直没有该服务时（desktop），回调不触发 → 超时后按降级路径显示「状态未知」，
+   卡片其余能力不受影响。
+
 ## 6. 后续改进方向（按优先级）
 
 1. **展示还原**：推动 dsh 官方提供外层可见的会话读取/改写缝或映射 RPC；
@@ -109,3 +171,6 @@
   - `apps/cli/src/plugin.ts`、`vendor/cordis-plugin-include`（bundle patch/include）
 - 官方 npm 0.1.1-rc.2（`node_modules/@deepseek-ai/dsh`）：同一套 web/客户端机制，
   模块表行与事件集合略少；可对照 `dsh-web-app` 与各 `dsh-client-*` 包。
+- 本机留存：`npm run dsh:compat [版本...]` 会把各版本缝所在包解压到仓库根的
+  `.dsh-versions/<版本>/`（已 gitignore，只在本机留存、不进提交），
+  上面 0.1.5 一节的证据路径即取自此目录，可直接 `rg` 复查或跨版本 diff。

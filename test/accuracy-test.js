@@ -198,7 +198,6 @@ test('泛化机构/村镇与真实机构并存：误伤与覆盖', async () => {
     ['数字字母公司', '与B2B公司签订合同。', '[REDACTED_COMPANY_'],
     ['区分局', '深圳市公安局南山区分局。', '[REDACTED_ORG_'],
     ['派出所独立', '碧阳派出所。', '[REDACTED_ORG_'],
-    ['人民法庭', '七星关区人民法院碧阳人民法庭。', '[REDACTED_ORG_'],
     ['户口所在地', '被告李小红户口所在地：浙江省杭州市。', '[REDACTED_ADDR_'],
     ['空格座机', '电话：0755 12345678。', '[REDACTED_TEL_'],
     ['无分隔座机', '电话：01012345678。', '[REDACTED_TEL_'],
@@ -211,7 +210,6 @@ test('泛化机构/村镇与真实机构并存：误伤与覆盖', async () => {
     ['冻结其在银行', '冻结其在中国工商银行深圳南山支行的存款。', '[REDACTED_COMPANY_'],
     ['在招商银行', '在招商银行开户。', '[REDACTED_COMPANY_'],
     ['贵州茅台', '贵州茅台酒厂（集团）有限责任公司。', '[REDACTED_COMPANY_'],
-    ['贵州高院', '向贵州省高级人民法院申请再审。', '[REDACTED_ORG_'],
     ['本溪钢铁', '本溪钢铁公司。', '[REDACTED_COMPANY_'],
     ['华南区（大区）', '他负责华南区的销售业务。', ''],
     ['大湾区（宏观）', '大湾区建设提速。', ''],
@@ -236,11 +234,6 @@ test('泛化机构/村镇与真实机构并存：误伤与覆盖', async () => {
     ['原告人', '附带民事诉讼原告人王五。', '[REDACTED_NAME_'],
     ['被害人', '被害人王五。', '[REDACTED_NAME_'],
     ['举报人', '举报人王五。', '[REDACTED_NAME_'],
-    ['铁路运输法院', '北京铁路运输法院。', '[REDACTED_ORG_'],
-    ['互联网法院', '广州互联网法院。', '[REDACTED_ORG_'],
-    ['知识产权法院', '北京知识产权法院。', '[REDACTED_ORG_'],
-    ['金融法院', '上海金融法院。', '[REDACTED_ORG_'],
-    ['海事法院', '大连海事法院。', '[REDACTED_ORG_'],
     ['被处罚人', '被处罚人王五。', '[REDACTED_NAME_'],
     ['违法行为人', '违法行为人李四。', '[REDACTED_NAME_'],
     ['犯罪嫌疑人', '犯罪嫌疑人李四。', '[REDACTED_NAME_'],
@@ -287,6 +280,14 @@ test('泛化机构/村镇与真实机构并存：误伤与覆盖', async () => {
   const mustKeepSame = [
     ['深圳有一所医院（泛指）', '深圳有一所医院。'],
     ['北京的医院（泛指）', '北京的医院很多。'],
+    // 法院/法庭是国家审判机关名（公开信息，且案号代字已写明法院），默认保留：
+    // 保留让管辖判断与「此致 XX 法院」起草拿到真值；需要遮罩时把法院全称加进 customTerms。
+    ['法院：基层', '此致，毕节市七星关区人民法院。'],
+    ['法院：人民法庭', '七星关区人民法院碧阳人民法庭。'],
+    ['法院：中级', '此致，北京市第一中级人民法院。'],
+    ['法院：高级', '向贵州省高级人民法院申请再审。'],
+    ['法院：最高', '此致，中华人民共和国最高人民法院。'],
+    ['法院：专门法院', '北京铁路运输法院、广州互联网法院、北京知识产权法院、上海金融法院、大连海事法院。'],
   ]
   for (const [name, text] of mustKeepSame) {
     const out = await H.dispatch(text)
@@ -343,21 +344,27 @@ test('地址链与多姓名：脱敏覆盖与误伤回归', async () => {
   }
 })
 
-test('机关全称识别：法院/检察院/公安分局完整脱敏', async () => {
+test('机关全称识别：检察院/公安/自治组织脱敏，法院/法庭默认保留', async () => {
   const cases = [
-    ['市人民法院', '此致，毕节市七星关区人民法院。', '[REDACTED_ORG_'],
-    ['中级法院', '此致，北京市第一中级人民法院。', '[REDACTED_ORG_'],
-    ['最高法院', '此致，中华人民共和国最高人民法院。', '[REDACTED_ORG_'],
     ['公安局+分局+派出所', '毕节市公安局七星关分局碧阳派出所。', '[REDACTED_ORG_'],
     ['检察院', '此致，毕节市人民检察院。', '[REDACTED_ORG_'],
     ['街道办事处', '中关村街道办事处的通知。', '[REDACTED_ORG_'],
     ['居委会', '朝阳区和平里社区居民委员会。', '[REDACTED_ORG_'],
     ['村委会', '正定县南楼村村民委员会。', '[REDACTED_ORG_'],
   ]
+  const courts = [
+    '此致，毕节市七星关区人民法院。',
+    '此致，中华人民共和国最高人民法院。',
+    '七星关区人民法院碧阳人民法庭。',
+  ]
   for (const [name, text, ph] of cases) {
     const out = await H.dispatch(text)
     if (!out.includes(ph)) throw new Error(name + ' 未脱敏: ' + out)
     if (/]DACTED_|\][A-Z]/.test(out)) throw new Error(name + ' 占位符异常: ' + out)
+  }
+  for (const text of courts) {
+    const out = await H.dispatch(text)
+    if (out !== text) throw new Error('法院名被误脱敏: ' + text + ' => ' + out)
   }
 })
 
@@ -597,7 +604,7 @@ test('姓名/公司/机关边界', async () => {
     ['原告' + zhan + '与被告' + li + '离婚纠纷', true],
     ['原告' + zhan + '诉被告' + li, true],
     ['查询' + cn(0x963f, 0x91cc, 0x5df4, 0x5df4, 0x96c6, 0x56e2) + '工商信息', true], // 阿里巴巴集团
-    ['委托' + cn(0x5317, 0x4eac, 0x5e02, 0x7b2c, 0x4e00, 0x4e2d, 0x7ea7, 0x4eba, 0x6c11, 0x6cd5, 0x9662) + '代理', true], // 北京市第一中级人民法院
+    ['委托' + cn(0x5317, 0x4eac, 0x5e02, 0x4eba, 0x6c11, 0x68c0, 0x5bdf, 0x9662) + '审查起诉', true], // 北京市人民检察院
   ]
   for (const [text] of cases) {
     const out = await H.dispatch(text)
@@ -674,9 +681,14 @@ test('客户端产物与 manifest 跨版本一致性', async () => {
     if (spec === 'react/jsx-runtime') return jsxStub
     throw new Error('client.js 意外 require: ' + spec)
   })
-  const expectInject = ['slots', 'locale', 'remote', 'remote.pluginInventory', 'settingsScope']
+  // remote.pluginInventory 必须是可选依赖：写进 inject 会让 desktop profile（DSH Desktop
+  // 客户端无该服务）整个模块停在 PENDING、卡片永不注册（GitHub issue #2）
+  const expectInject = ['slots', 'locale', 'settingsScope']
   if (JSON.stringify(clientMod.inject) !== JSON.stringify(expectInject)) {
     throw new Error('client inject 服务键不符: ' + JSON.stringify(clientMod.inject))
+  }
+  if (clientMod.inject.includes('remote.pluginInventory')) {
+    throw new Error('client 仍硬依赖 remote.pluginInventory：desktop profile 会停在 PENDING')
   }
 
   function makeScope(initialValue, revision, opts = {}) {
@@ -698,9 +710,10 @@ test('客户端产物与 manifest 跨版本一致性', async () => {
       },
     }
   }
-  function makeCtx(scope) {
+  function makeCtx(scope, opts = {}) {
     const dicts = {}
     const tabs = {}
+    const withInventory = opts.withInventory !== false
     const ctx = {
       effect: (fn) => { fn(); return () => {} },
       locale: {
@@ -714,12 +727,20 @@ test('客户端产物与 manifest 跨版本一致性', async () => {
         inject: (key, fn) => { tabs[key] = fn },
         register: (cfg, comp) => ({ cfg, comp }),
       },
-      remote: {
+      // 软注入桩：web profile 有 remote.pluginInventory → 回调立即触发；
+      // desktop profile 没有该服务 → 回调永不触发（且 ctx.remote 不可访问）
+      inject: (deps, cb) => {
+        if (withInventory && Array.isArray(deps) && deps.includes('remote.pluginInventory')) cb(ctx)
+        return () => {}
+      },
+      settingsScope: { bind: () => scope },
+    }
+    if (withInventory) {
+      ctx.remote = {
         pluginInventory: {
           list: async () => ({ ok: true, value: { entries: [{ entryId: 'privmask-entry', moduleName: 'dsh-privmask', enabled: true, fiberPhase: 'active' }] } }),
         },
-      },
-      settingsScope: { bind: () => scope },
+      }
     }
     clientMod.apply(ctx)
     const tab = tabs['settings.plugins.tab']
@@ -756,6 +777,19 @@ test('客户端产物与 manifest 跨版本一致性', async () => {
   try { await card2.inject().update('privmask', { enabled: false }, 9) } catch { threw = true }
   if (!threw) throw new Error('写入未生效时 update 未报错')
 
+  // —— desktop profile 场景（宿主无 remote.pluginInventory）：卡片仍须注册，开关照常可用 ——
+  const desktopScope = makeScope(cfgBase, 3)
+  const { cfg: desktopCard } = makeCtx(desktopScope, { withInventory: false })
+  if (desktopCard.id !== 'privmask') throw new Error('desktop 场景卡片未注册')
+  const desktopProps = desktopCard.inject()
+  threw = false
+  try { await desktopProps.list() } catch (e) { threw = String(e && e.message).includes('status') || /pluginInventory/.test(String(e && e.message)) }
+  if (!threw) throw new Error('desktop 场景 list() 未按能力降级')
+  const desktopDescribe = await desktopProps.describe()
+  if (desktopDescribe.namespaces[0].value.enabled !== true) throw new Error('desktop 场景 describe 不可用')
+  await desktopProps.update('privmask', { redactNames: false }, 3)
+  if (desktopScope.state.value.redactNames !== false) throw new Error('desktop 场景开关写入失败')
+
   // —— 迷你首帧渲染（无 DOM）：校验文案、版本号与署名链接 ——
   const renderStates = {
     enabled: true, cfg: { enabled: true, redactNames: true, redactCompanies: true, redactOrgs: true, redactAddress: true, redactCredentials: true, customTerms: [] },
@@ -784,7 +818,9 @@ test('客户端产物与 manifest 跨版本一致性', async () => {
   collect(rendered, texts, hrefs)
   const ui = texts.join(' ')
   const uiFlat = ui.replace(/\s+/g, '')
-  for (const expect of ['隐私保护：插件已启用', '插件版本：v0.2.42', '总开关', '复制更新命令', '复制状态', '当前生效', '免责声明', '作者：JunyuZhan', '此处为常用开关', 'dsh 0.1.0-rc.6+', '启发式本地处理']) {
+  // 版本号取自 package.json：文案必须跟着清单走（发版不必改测试），仍能拦住卡片与清单漂移
+  const pkgVersion = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version
+  for (const expect of ['隐私保护：插件已启用', '插件版本：v' + pkgVersion, '总开关', '复制更新命令', '复制状态', '当前生效', '免责声明', '作者：JunyuZhan', '此处为常用开关', 'dsh 0.1.0-rc.6+', '启发式本地处理']) {
     if (!uiFlat.includes(expect.replace(/\s+/g, ''))) throw new Error('卡片渲染缺少文案: ' + expect + ' => ' + ui)
   }
   if (!hrefs.includes('https://github.com/JunyuZhan/dsh-privmask')

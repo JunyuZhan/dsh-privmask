@@ -1,3 +1,4 @@
 node_modules/
+.dsh-versions/
 :memory:.ses
 .DS_Store

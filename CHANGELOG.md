@@ -3,6 +3,59 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.43] - 2026-09-22
+
+### 行为变更（默认口径）
+
+- **法院/法庭名称默认保留**：法院是国家审判机关，名称是公开信息、不指向自然人，
+  而案号里的法院代字本就写明法院（`（2024）黔0502民初1234号` → 毕节市七星关区人民法院），
+  脱了法院名却留案号等于白脱；保留还能让管辖判断与「此致 XX 法院」起草拿到真值。
+  实现是在 `org` 规则命中处放行「以 法院/法庭 结尾」的片段，并同步在 `street` 规则
+  校验器放行同形片段（否则「X区人民法院」会被当路名吞掉）。
+  检察机关、公安、街道办、村委会等其余机关照旧脱敏；确需遮罩某个法院时，
+  把法院全称加进 `customTerms` 即可（自定义词表优先于内置规则）。
+  回归：accuracy 增设法院保留用例、self-test「法院默认保留/检察机关脱敏」、
+  reliability K2/K2b/Q8/Q8b；README 安全模型与配置表同步。
+
+### 修复（desktop profile 卡片不显示，issue #1 / #2）
+
+- `remote.pluginInventory` 从客户端硬依赖改为**可选软注入**：DSH Desktop 的客户端运行时
+  没有这个服务，写进 `inject` 会让整个客户端模块停在 PENDING、卡片永不注册
+  （报错形态 `failed to apply loader entry ... cannot get property "remote" without inject`）。
+  现在改为 `ctx.inject(['remote','remote.pluginInventory'], cb)` 按能力取用（两个键都要写：
+  cordis 只允许访问已注入的服务属性；回调异步落地，`list()` 会等它、2 秒超时）。
+  拿不到该服务时降级为「插件状态未知」，开关/自定义词表等走 `settingsScope` 的能力不受影响。
+  回归：accuracy 客户端测试固定 `inject = [slots, locale, settingsScope]`，
+  并新增 desktop 场景（无 `remote.pluginInventory`）仍能注册卡片、describe/update 可用。
+- 卡片「复制更新命令」不再写死 `--profile web`，改为 `--profile <profile>`。
+- README「profile 差异」更正：卡片在 desktop 不显示的真实原因是客户端服务缺失，
+  不是有意的功能降级；并补充 desktop 安装与配置文件模式示例。
+
+### 适配（dsh 0.1.5-rc.2）
+
+- 新增宿主适配自检 `tools/dsh-compat-check.mjs`（`npm run dsh:compat [版本...]`）：
+  按版本下载 privmask 依赖的缝所在包并解压到仓库根 `.dsh-versions/<版本>/`
+  （已 gitignore，只在本机留存、不进提交与发布包），逐条断言 `llm/stream`、
+  `agent/pre-step`、`tools/post-execute`、`tools/ptc-dispatch-log`、`settings.register`、
+  `attachments.readImage`、客户端模块等缝仍存在，打印「版本 × 缝」矩阵，
+  必需缝缺失即退出码 1。脚本需要联网，**不进** `prepublishOnly`，发布流程保持离线可跑。
+- 实测核对 0.1.5-rc.2 与 0.1.6-alpha.2：上述缝全部仍在且签名兼容（详见 `docs/dsh-research.md` §5.1）；
+  把 `GenerateOptions` 全 12 个字段（`reasoningEffort` / `temperature` / `maxTokens` / `stop` /
+  `purpose` 等，0.1.1 起即存在、此前只在白名单外走兜底）固化为必测口径：字段原样保留、
+  不触发 failClosed，其中 `stop` 内的敏感值与消息共用同一占位符
+  （模型只见占位符，停止串需同步改写才匹配得上）；可靠性测试新增 AF1-AF5（173 → 178）。
+- `@deepseek-ai/dsh-client-runtime` 自 dsh 0.1.2 起已不存在（后继为
+  `@deepseek-ai/dsh-client-modules`）：新宿主模块表对未知 inject 条目直接跳过，
+  卡片仍正常加载；该条目以及其它「声明了但该版本没有」的依赖由自检脚本显式列出，
+  避免声明悄悄腐烂。
+- 隐私保护卡片的适配范围文案更新为「dsh 0.1.0-rc.6+（0.1.1-rc.2 / 0.1.5-rc.2 / 0.1.6-alpha.2 已实测核对）」。
+
+### 文档
+
+- README「版本适配与升级策略」重写为实测口径；`docs/dsh-research.md` 新增 0.1.5-rc.2
+  复核一节（逐缝证据、`file`/`image` 投影发生在水瀑之后、展示层还原仍不可达、
+  `agent/inbox/spliced` 限制仍在）；CONTRIBUTING 增加 dsh 适配约定。
+
 ## [0.2.42] - 2026-09-05
 
 ### 修复（适配自检日志）

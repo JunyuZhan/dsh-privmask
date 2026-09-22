@@ -193,7 +193,10 @@ const courtName = cn(0x5317, 0x4eac, 0x5e02, 0x7b2c, 0x4e00, 0x4e2d, 0x7ea7, 0x4
 const rk1 = await Hf.dispatch('查询' + coName + '的工商信息');
 t('K1 公司名不吞查询', rk1.includes('查询') && rk1.includes('[REDACTED_COMPANY_') && !rk1.includes(coName), rk1);
 const rk2 = await Hf.dispatch('委托' + courtName + '代理');
-t('K2 机关不吞委托', rk2.includes('委托') && rk2.includes('[REDACTED_ORG_') && !rk2.includes(courtName), rk2);
+t('K2 法院名保留且不吞委托', rk2.includes('委托') && rk2.includes(courtName) && rk2.includes('代理'), rk2);
+const procName = cn(0x5317, 0x4eac, 0x5e02, 0x4eba, 0x6c11, 0x68c0, 0x5bdf, 0x9662);
+const rk2b = await Hf.dispatch('委托' + procName + '审查起诉');
+t('K2b 检察院仍脱敏且不吞委托', rk2b.includes('委托') && rk2b.includes('[REDACTED_ORG_') && !rk2b.includes(procName), rk2b);
 const rk3 = await H.dispatch('aws_secret_access_key=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY');
 t('K3 AWS secret key', rk3.includes('[REDACTED_KEY_') && !rk3.includes('wJalrXUtnFEMI'), rk3);
 // 公司识别：无地区/行业关键词的常见大公司（集团后缀 / 技术行业词）
@@ -516,7 +519,9 @@ t('Q6 关闭姓名脱敏-保留姓名', q6.includes(S.name1) && q6.includes(S.na
 const q7 = await H.dispatch('与' + coName + '签订合同');
 t('Q7 默认公司脱敏', q7.includes('[REDACTED_COMPANY_') && !q7.includes(coName), q7);
 const q8 = await H.dispatch('向' + courtName + '起诉');
-t('Q8 默认机关脱敏', q8.includes('[REDACTED_ORG_') && !q8.includes(courtName), q8);
+t('Q8 法院名默认保留', q8.includes(courtName) && q8.includes('[REDACTED_ORG_') === false, q8);
+const q8b = await H.dispatch('向' + cn(0x5317, 0x4eac, 0x5e02, 0x4eba, 0x6c11, 0x68c0, 0x5bdf, 0x9662) + '申请抗诉');
+t('Q8b 检察院默认脱敏', q8b.includes('[REDACTED_ORG_') && !q8b.includes(cn(0x5317, 0x4eac, 0x5e02, 0x4eba, 0x6c11, 0x68c0, 0x5bdf, 0x9662)), q8b);
 const qCase = '（2024）粤01民初123号';
 const q9 = await H.dispatch(qCase);
 t('Q9 默认案号保留', q9.includes(qCase), q9);
@@ -798,6 +803,30 @@ await missHarness.run();
 const missEv = missHarness.emitted.find(([n, p]) => n === 'privmask/stats' && p.kind === 'restoreMiss');
 t('V5 未命中占位符只统计一次', missEv !== undefined && missEv[1].count === 1
   && Array.isArray(missEv[1].samples) && missEv[1].samples.includes('[REDACTED_EMAIL_99]'), JSON.stringify(missEv));
+
+// AF. dsh 请求形态（GenerateOptions 全 12 字段，0.1.1 起即如此）：provider/model/reasoningEffort/
+//    messages/system/tools/temperature/maxTokens/stop/signal/sessionId/purpose。
+//    这些字段必须既不触发 failClosed，也不被脱敏管线改动（0.1.5 起成为必测口径）。
+const AFH = makeHarness({ logRedactions: false });
+const afOut = await AFH.dispatch('原告 ' + S.name1 + ' 电话 ' + S.phone, {
+  sessionId: 'sess-W',
+  reasoningEffort: 'high',
+  temperature: 0.3,
+  maxTokens: 4096,
+  stop: ['STOP'],
+  purpose: 'compaction',
+  system: '系统提示 邮箱 ' + S.email,
+});
+const afReq = AFH.received;
+t('AF1 dsh 0.1.5 请求形态正常脱敏（未触发 failClosed）', afReq !== null && afOut.includes('[REDACTED_NAME_') && afOut.includes('[REDACTED_PHONE_'), afOut);
+t('AF2 dsh 0.1.5 新增字段原样保留', afReq !== null && afReq.reasoningEffort === 'high' && afReq.temperature === 0.3 && afReq.maxTokens === 4096 && afReq.purpose === 'compaction' && Array.isArray(afReq.stop) && afReq.stop[0] === 'STOP', JSON.stringify({ e: afReq && afReq.reasoningEffort, t: afReq && afReq.temperature, m: afReq && afReq.maxTokens, p: afReq && afReq.purpose }));
+t('AF3 辅助调用 system 字段同样脱敏', afReq !== null && afReq.system.includes('[REDACTED_EMAIL_') && !afReq.system.includes(S.email), String(afReq && afReq.system));
+t('AF4 sessionId 仍被移除', afReq !== null && !('sessionId' in afReq));
+// AF5: stop 序列里的敏感值与消息共用同一占位符（模型只见占位符，停止串必须同步改写才匹配得上）
+const AFH2 = makeHarness({ logRedactions: false });
+const af2Out = await AFH2.dispatch('原告 ' + S.name1 + ' 起诉', { sessionId: 'sess-AF2', stop: ['原告 ' + S.name1] });
+const af2Stop = AFH2.received.stop[0];
+t('AF5 stop 序列与消息共用同一占位符', af2Stop === '原告 [REDACTED_NAME_1]' && af2Out.includes('[REDACTED_NAME_1]'), af2Stop + ' | ' + af2Out);
 
 // X. 运行时设置：dsh-settings 命名空间注册 + live 生效（引擎重建）
 function settingsHarness(config) {

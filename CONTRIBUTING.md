@@ -46,6 +46,14 @@ node test/fuzz-test.js        # 随机文本：不崩 + 幂等
    - `CHANGELOG.md`（Keep a Changelog 格式）
    - `README.md` 的测试计数（如涉及）
 
+## dsh 适配约定
+
+- 宿主缝（事件名、服务名、客户端模块 id）变更时：先跑 `npm run dsh:compat <新版本>`
+  看缝是否还齐，再改代码；核对结论写进 `docs/dsh-research.md` 与 README 的版本适配段。
+- `.dsh-versions/` 是各版本源码的本机留存目录（gitignore），不提交、不进包；
+  新增依赖的宿主包时把它加进 `tools/dsh-compat-check.mjs` 的 `PACKAGES` 列表。
+- 该脚本需要联网，**不要**挂进 `prepublishOnly`（发布必须能离线跑通）。
+
 ## 提交信息
 
 沿用仓库现有风格（中文、前缀标注类型）：
