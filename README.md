@@ -261,6 +261,29 @@ node tools/redact-text.mjs input.txt out.txt --config cfg.json
   再跑仓库四套测试；若 dsh 客户端模块表/事件名发生变化，优先检查卡片是否正常出现、
   控制台是否有 `展示层还原未安装` 类告警，再按告警决定是否等新版本插件。
 
+## 跨平台支持
+
+核心链路（出站脱敏、入站还原、落盘遮罩、词表/开关、文本与 docx CLI、`npm run dsh:compat`）
+是纯 Node 实现，macOS / Linux / Windows 无差异，只依赖 Node ≥18。
+
+只有「本地 PDF / OCR」这类必须借外部程序的工具存在平台差异，0.2.44 起已按平台自动适配：
+
+| 能力 | 依赖 | 平台差异与处理 |
+|---|---|---|
+| `tools/pdf-preflight.mjs`、`tools/redact-pdf.mjs` | poppler（`pdftotext`/`pdfinfo`）+ ghostscript | POSIX 下 ghostscript 叫 `gs`，Windows 下是 `gswin64c` / `gswin32c`；0.2.44 起按平台自动探测并在缺失时给出对应安装指引（`choco` / `scoop` / `brew` / `apt`） |
+| `localOcr`（默认关） | `~/.ocr-tool` 本地视觉服务 | Python venv 布局不同：Windows 是 `venv\Scripts\python.exe`，POSIX 是 `venv/bin/python`；0.2.44 起自动选择（也可用 `localOcrCommand` 完全接管） |
+| docx / 纯文本 / 审计摘要 / 对照工具 | 无外部依赖 | 纯 JS，跨平台一致 |
+
+文本保真方面，Windows 的 CRLF 换行在脱敏后原样保留（0.2.43 及以前，地址规则会把行尾的 `\r`
+一起吞掉，导致整行从 `\r\n` 变成 `\n`；0.2.44 修正，回归见 reliability AG1/AG1b）。
+
+宿主侧：`web` profile 与 DSH Desktop（`desktop` profile）都可用。Desktop 的客户端运行时没有
+`remote.pluginInventory`，卡片的「插件已启用/未启用」状态行会显示「插件状态未知」，其余开关照常
+（见 [issue #2](https://github.com/JunyuZhan/dsh-privmask/issues/2)）。
+
+诚实声明：Windows 上的行为由代码审查 + 跨平台回归（AG1–AG4）保证，**尚未在 Windows 真机跑过**；
+遇到问题请附平台与复现步骤提 issue。
+
 ## 已知限制
 
 - **图片默认不直发**：非文本内容默认剥离（不发送）；启用 `localOcr` 后图片先在本地
@@ -291,7 +314,7 @@ node tools/redact-text.mjs input.txt out.txt --config cfg.json
 
 ```sh
 node test/self-test.js        # 15 项功能回归（端到端拦截 + 中文实体 + 法院保留/检察机关脱敏）
-node test/reliability-test.js # 180 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/base64文本预检/本地OCR兜底/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/词表热更新/字符串 content 还原/出站脱敏/离境审计/审计摘要CLI/PDF预检CLI/PDF覆写脱敏/dsh0.1.5请求形态）
+node test/reliability-test.js # 187 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/base64文本预检/本地OCR兜底/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/词表热更新/字符串 content 还原/出站脱敏/离境审计/审计摘要CLI/PDF预检CLI/PDF覆写脱敏/dsh0.1.5请求形态/跨平台CRLF与路径）
 node test/accuracy-test.js    # 26 项准确性（法律文档矩阵/凭据/PII校验/证件与信用代码上下文/复姓/泛化机构与村镇/姓名标签边界/客户端版本一致性）
 node test/docx-test.js        # docx 本地脱敏（格式保留/非文本条目原样/占位符写入）
 node test/fuzz-test.js        # 300 例随机文本 × 2 断言（不崩 + 幂等，共 600 断言）

@@ -111,6 +111,9 @@ async function ensurePackage(name, version, versionDir) {
     execFileSync('tar', ['-xzf', tgz, '-C', target], { stdio: 'pipe' });
   } catch (error) {
     rmSync(target, { recursive: true, force: true });
+    if (error && error.code === 'ENOENT') {
+      return { ok: false, reason: '未找到 tar 命令（Windows 需 Win10 1803+ 自带 tar，或改用 git bash/WSL）' };
+    }
     return { ok: false, reason: '解压失败: ' + (error && error.message ? error.message : error) };
   } finally {
     rmSync(tgz, { force: true });

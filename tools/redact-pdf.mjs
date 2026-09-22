@@ -25,6 +25,7 @@ import { inflateSync, deflateSync } from 'node:zlib'
 import { tmpdir } from 'node:os'
 import { Config } from '../lib/index.js'
 import { createEngine } from '../lib/engine.js'
+import { gsCandidates, haveBin, resolveBin, INSTALL_HINT } from './bins.mjs'
 
 const execFileAsync = promisify(execFile)
 
@@ -117,19 +118,17 @@ if (args.inputs.length === 0) {
   process.exit(2)
 }
 
-async function haveBin(name, probe) {
-  try { await execFileAsync(name, probe); return true } catch { return false }
-}
-const need = [
-  ['pdftotext', ['-v']],
-  ['pdfinfo', ['-v']],
-  ['gs', ['--version']],
-]
-for (const [bin, probe] of need) {
+for (const [bin, probe] of [['pdftotext', ['-v']], ['pdfinfo', ['-v']]]) {
   if (!(await haveBin(bin, probe))) {
-    console.error('缺少 ' + bin + '（poppler/ghostscript）。macOS: brew install poppler ghostscript')
+    console.error('缺少 ' + bin + '（poppler）。请先安装：' + INSTALL_HINT)
     process.exit(3)
   }
+}
+// ghostscript 在 Windows 上的可执行名是 gswin64c/gswin32c，按平台探测
+const gsBin = await resolveBin(gsCandidates(), ['--version'])
+if (gsBin === null) {
+  console.error('缺少 ghostscript。请先安装：' + INSTALL_HINT)
+  process.exit(3)
 }
 
 function decodeEntities(s) {
@@ -209,7 +208,7 @@ function sensitiveValues(rctx) {
 
 async function rasterize(pdf, page, dpi, dir) {
   const pngPath = join(dir, 'page-' + randomUUID() + '.png')
-  await execFileAsync('gs', ['-q', '-dNOPAUSE', '-dBATCH', '-dSAFER', '-sDEVICE=png16m', '-r' + dpi,
+  await execFileAsync(gsBin, ['-q', '-dNOPAUSE', '-dBATCH', '-dSAFER', '-sDEVICE=png16m', '-r' + dpi,
     '-dFirstPage=' + page, '-dLastPage=' + page, '-sOutputFile=' + pngPath, pdf], { timeout: 180000, maxBuffer: 32 * 1024 * 1024 })
   const decoded = decodePng(await readFile(pngPath))
   return { pngPath, ...decoded }

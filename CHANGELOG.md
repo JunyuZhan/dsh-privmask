@@ -3,6 +3,27 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.44] - 2026-09-22
+
+### 修复（跨平台兼容）
+
+- **CRLF 保真**：地址规则（`addr` 的三条正则）收尾字符类未排除 `\r`，Windows 换行文本里
+  行尾的 `\r` 会被吞进地址 span，脱敏后整行从 `\r\n` 变成 `\n`。现已排除，CRLF 输入原样保留
+  （回归 reliability AG1–AG1d，含多规则 CRLF 文档逐行保真）。
+- **本地 OCR 解释器路径**：默认命令写死 `~/.ocr-tool/venv/bin/python`，Windows 的 venv 布局是
+  `venv\Scripts\python.exe`，会导致 `localOcr` 直接找不到解释器。新增 `ocrPythonPath()`
+  按平台选择，`tools/pdf-preflight.mjs` 同步使用（回归 AG2）。
+- **OCR 失败文本里的路径剥离**：`shortError` 只剥 POSIX 路径，Windows 盘符路径
+  （`C:\Users\...`）会随「图片本地OCR不可用: …」说明文本一起发往云端。现同时剥盘符路径（回归 AG4）。
+- **ghostscript 可执行名**：PDF 工具写死 `gs`，Windows 上的 `gswin64c`/`gswin32c` 会误判为
+  「缺少 ghostscript」。新增 `tools/bins.mjs` 按平台探测，并把缺失提示改为按平台的安装指引
+  （Windows: `choco`/`scoop`）（回归 AG3）。
+
+### 文档
+
+- README 新增「跨平台支持」一节：纯 Node 链路一致；PDF/OCR 的平台差异与处理；CRLF 保真说明；
+  宿主侧 web / DSH Desktop 的能力差异；并如实声明 Windows 尚未真机验证。
+
 ## [0.2.43] - 2026-09-22
 
 ### 行为变更（默认口径）

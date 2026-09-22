@@ -1062,6 +1062,40 @@ const Ho4 = ocrHarness({}, [process.execPath, ocrOkScript]);
 const ab4 = await Ho4.resolve('t', 'm');
 t('AB4 纯文本模型能力上报软化以放行图片检查', ab4 && ab4.inputModalities === undefined, JSON.stringify(ab4));
 
+// AG. 跨平台回归：CRLF 保真 / OCR 解释器路径 / OCR 失败文本路径剥离 / ghostscript 可执行名
+const { ocrPythonPath } = await import('../lib/index.js');
+const { gsCandidates } = await import('../tools/bins.mjs');
+const AGC = makeHarness({ logRedactions: false });
+const agCrlf = '原告 ' + S.name1 + '\r\n住址：广东省深圳市南山区粤海街道\r\n';
+const ag1 = await AGC.dispatch(agCrlf);
+t('AG1 CRLF 行尾不被地址规则吞掉', ag1.includes('[REDACTED_ADDR_') && (ag1.match(/\r\n/g) || []).length === 2, JSON.stringify(ag1));
+const ag1b = await AGC.dispatch(ag1);
+t('AG1b CRLF 输入幂等', ag1b === ag1, JSON.stringify(ag1b));
+// 覆盖更多规则（姓名/电话/公司/机关/案号/日期/邮箱）后 CRLF 仍逐行保留
+const agCrlfDoc = [
+  '原告 ' + S.name1 + '，电话 ' + S.phone + '，邮箱 ' + S.email + '\r\n',
+  '被告 深圳市南山区科技有限公司\r\n',
+  '此致，毕节市七星关区人民法院\r\n',
+  '（2024）黔0502民初1234号\r\n',
+  '出生日期：1990-01-01\r\n',
+].join('');
+const ag1c = await AGC.dispatch(agCrlfDoc);
+t('AG1c 多规则 CRLF 文档逐行保真', (ag1c.match(/\r\n/g) || []).length === 5 && !/(?<!\r)\n/.test(ag1c), JSON.stringify(ag1c));
+t('AG1d 多规则 CRLF 文档幂等', (await AGC.dispatch(ag1c)) === ag1c);
+t('AG2 OCR 解释器路径按平台（Windows venv 是 Scripts/python.exe）',
+  /Scripts[\\/]python\.exe$/.test(ocrPythonPath('C:\\Users\\u', 'win32')) && /[\\/]bin[\\/]python$/.test(ocrPythonPath('/home/u', 'linux')),
+  ocrPythonPath('C:\\Users\\u', 'win32') + ' | ' + ocrPythonPath('/home/u', 'linux'));
+t('AG3 ghostscript 可执行名按平台（Windows 是 gswin64c）',
+  gsCandidates('win32').includes('gswin64c') && gsCandidates('darwin').join(',') === 'gs',
+  gsCandidates('win32').join(',') + ' | ' + gsCandidates('darwin').join(','));
+// OCR 失败文本会作为说明文本上云，其中的本地路径必须剥离（Windows 盘符路径此前漏剥）
+const agWinScript = auditJoin(ocrScriptDir, 'win-path.mjs');
+ocrWrite(agWinScript, 'console.error("boom at C:\\\\Users\\\\alice\\\\私有\\\\scan.png and /Users/apple/secret.png"); process.exit(2);\n');
+const Ho5 = ocrHarness({}, [process.execPath, agWinScript]);
+const ag4 = await Ho5.run([{ type: 'image', attachment: { attachmentId: 'att-ocr-win', mediaType: 'image/png' } }]);
+const ag4Text = ag4.received ? ag4.received.messages[0].content.map((b) => (b.type === 'text' ? b.text : b.type)).join('') : '';
+t('AG4 OCR 失败文本剥离 Windows/POSIX 路径', ag4Text.includes('图片本地OCR不可用') && !ag4Text.includes('C:\\Users') && !ag4Text.includes('/Users/apple'), ag4Text.slice(0, 160));
+
 // AC. 审计摘要 CLI（tools/audit-summary.mjs）：汇总/告警/损坏行容错/退出码
 const { spawnSync: acSpawn } = await import('node:child_process');
 const { fileURLToPath: acFileUrl } = await import('node:url');

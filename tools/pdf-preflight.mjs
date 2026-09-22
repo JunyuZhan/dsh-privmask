@@ -18,11 +18,12 @@ import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { randomUUID } from 'node:crypto'
-import { Config } from '../lib/index.js'
+import { Config, ocrPythonPath } from '../lib/index.js'
 import { createEngine } from '../lib/engine.js'
+import { gsCandidates, haveBin, resolveBin, INSTALL_HINT } from './bins.mjs'
 
 const execFileAsync = promisify(execFile)
-const OCR_PY = join(homedir(), '.ocr-tool', 'venv', 'bin', 'python')
+const OCR_PY = ocrPythonPath()
 const OCR_SCRIPT = join(homedir(), '.ocr-tool', 'ocr.py')
 
 async function parseArgs(argv) {
@@ -56,21 +57,14 @@ if (args.inputs.length === 0) {
   process.exit(2)
 }
 
-async function haveBin(name, probeArgs) {
-  try {
-    await execFileAsync(name, probeArgs)
-    return true
-  } catch {
-    return false
-  }
-}
-
 const havePdftotext = await haveBin('pdftotext', ['-v'])
 if (!havePdftotext) {
-  console.error('未找到 pdftotext（poppler）。请先安装：brew install poppler（macOS），或 apt install poppler-utils。')
+  console.error('未找到 pdftotext（poppler）。请先安装：' + INSTALL_HINT)
   process.exit(3)
 }
-const haveGs = await haveBin('gs', ['--version'])
+const gsBin = await resolveBin(gsCandidates(), ['--version'])
+const haveGs = gsBin !== null
+if (!haveGs) console.error('未找到 ghostscript。请先安装：' + INSTALL_HINT)
 const haveOcr = await haveBin(OCR_PY, [OCR_SCRIPT, '--check']).catch(() => false)
 
 async function pdfPageCount(pdf) {
@@ -89,7 +83,7 @@ async function ocrPage(pdf, page) {
   const dir = await mkdtemp(join(tmpdir(), 'privmask-pdf-'))
   const png = join(dir, 'page-' + randomUUID() + '.png')
   try {
-    await execFileAsync('gs', ['-q', '-dNOPAUSE', '-dBATCH', '-dSAFER', '-sDEVICE=png16m', '-r200',
+    await execFileAsync(gsBin, ['-q', '-dNOPAUSE', '-dBATCH', '-dSAFER', '-sDEVICE=png16m', '-r200',
       '-dFirstPage=' + page, '-dLastPage=' + page, '-sOutputFile=' + png, pdf], { timeout: 180000, maxBuffer: 16 * 1024 * 1024 })
     const { stdout } = await execFileAsync(OCR_PY, [OCR_SCRIPT, png, '--mode', 'json'], { timeout: 120000, maxBuffer: 64 * 1024 * 1024 })
     const out = JSON.parse(stdout.trim())
