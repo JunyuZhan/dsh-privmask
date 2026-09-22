@@ -278,7 +278,8 @@ node tools/redact-text.mjs input.txt out.txt --config cfg.json
 一起吞掉，导致整行从 `\r\n` 变成 `\n`；0.2.44 修正，回归见 reliability AG1/AG1b）。
 
 宿主侧：`web` profile 与 DSH Desktop（`desktop` profile）都可用。Desktop 的客户端运行时没有
-`remote.pluginInventory`，卡片的「插件已启用/未启用」状态行会显示「插件状态未知」，其余开关照常
+`remote.pluginInventory`，卡片会改用 `settingsScope` 命名空间的可用性推断状态（就绪 = 插件已启用），
+因此状态行同样有值，不再显示「未知」；其余开关照常
 （见 [issue #2](https://github.com/JunyuZhan/dsh-privmask/issues/2)）。
 
 诚实声明：Windows 上的行为由代码审查 + 跨平台回归（AG1–AG4）保证，**尚未在 Windows 真机跑过**；

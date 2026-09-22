@@ -782,9 +782,17 @@ test('客户端产物与 manifest 跨版本一致性', async () => {
   const { cfg: desktopCard } = makeCtx(desktopScope, { withInventory: false })
   if (desktopCard.id !== 'privmask') throw new Error('desktop 场景卡片未注册')
   const desktopProps = desktopCard.inject()
-  threw = false
-  try { await desktopProps.list() } catch (e) { threw = String(e && e.message).includes('status') || /pluginInventory/.test(String(e && e.message)) }
-  if (!threw) throw new Error('desktop 场景 list() 未按能力降级')
+  // 无 pluginInventory 时用 settings 命名空间可用性推断状态，而不是一律「未知」
+  const desktopList = await desktopProps.list()
+  if (desktopList.entries[0].moduleName !== 'dsh-privmask' || desktopList.entries[0].enabled !== true) {
+    throw new Error('desktop 场景未按 settings 命名空间推断出「已启用」: ' + JSON.stringify(desktopList))
+  }
+  const desktopUnavailableScope = makeScope(cfgBase, 3, { status: 'unavailable' })
+  const { cfg: desktopCard2 } = makeCtx(desktopUnavailableScope, { withInventory: false })
+  const desktopList2 = await desktopCard2.inject().list()
+  if (desktopList2.entries[0].enabled !== false) {
+    throw new Error('desktop 场景 settings 不可用时应推断为「未启用」: ' + JSON.stringify(desktopList2))
+  }
   const desktopDescribe = await desktopProps.describe()
   if (desktopDescribe.namespaces[0].value.enabled !== true) throw new Error('desktop 场景 describe 不可用')
   await desktopProps.update('privmask', { redactNames: false }, 3)

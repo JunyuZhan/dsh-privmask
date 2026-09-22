@@ -120,7 +120,18 @@ export function apply(ctx: ClientContext): void {
   const list: PrivmaskCardInjected['list'] = async () => {
     await inventoryReady
     if (inventory === undefined) {
-      throw new Error('宿主未提供 remote.pluginInventory（desktop 等宿主无此服务）：插件状态未知，开关仍可用')
+      // 宿主没有 remote.pluginInventory（如 DSH Desktop）：唯一可用的信号是 settings 命名空间——
+      // 它由本插件的 host 半边注册，命名空间就绪即说明插件在跑。据此给出状态而不是一律「未知」。
+      const snap = await waitReady().catch(() => null)
+      const enabled = snap === null || snap.status === 'loading' ? null : snap.status === 'ready'
+      return {
+        entries: [{
+          entryId: 'privmask',
+          moduleName: 'dsh-privmask',
+          enabled,
+          fiberPhase: enabled === null ? 'unknown' : enabled ? 'active' : 'inactive',
+        }],
+      } as PrivmaskCardInjected['list'] extends () => Promise<infer T> ? T : never
     }
     const result = await inventory.list()
     if (!result.ok) {
