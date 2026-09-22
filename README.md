@@ -329,6 +329,21 @@ npm run dsh:compat                 # 核对 0.1.1-rc.2 与 0.1.5-rc.2
 npm run dsh:compat -- 0.1.6-alpha.2   # 核对指定版本（已核对，结论同上）
 ```
 
+发版冒烟（需要本机已装 dsh 且 profile 里装了本插件；不调模型、不花钱）：
+
+```sh
+npm run smoke                      # 默认 --profile web
+npm run smoke -- --profile desktop # 指定 profile
+```
+
+它断言四件实际踩过坑的事：插件确实挂载（`[privmask] 适配检查`）、设置命名空间已注册、
+客户端模块表含 `dsh-privmask/client.js`（界面能看到卡片）、profile 里装的就是仓库这份代码
+（版本一致，可用 `--allow-version-drift` 放宽）。退出码 0/1，可直接进 CI 或发版清单。
+
+发布本身由 `.github/workflows/publish.yml` 承担：打 tag（`v<版本>`）→ 校验 tag 与
+`package.json` 一致 → 跑测试 → `npm publish --provenance`（npm Trusted Publishing/OIDC，
+无需 2FA；版本已存在时自动跳过）。
+
 ## 诊断与统计
 
 - **控制台日志**：所有关键动作以 `[privmask]` 前缀输出，如启动配置、每次脱敏统计

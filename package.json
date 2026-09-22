@@ -70,6 +70,7 @@
   "scripts": {
     "prepublishOnly": "node test/self-test.js && node test/accuracy-test.js && node test/reliability-test.js && node test/fuzz-test.js && node test/docx-test.js",
     "mask:preview": "node tools/mask-preview.mjs",
-    "dsh:compat": "node tools/dsh-compat-check.mjs"
+    "dsh:compat": "node tools/dsh-compat-check.mjs",
+    "smoke": "node tools/smoke.mjs"
   }
 }

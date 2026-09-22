@@ -67,10 +67,21 @@ chore: 发布准备
 
 ## 发布流程（维护者）
 
-1. 确认四套测试全绿、`PLUGIN_VERSION` 与 `package.json` 一致
-2. `npm publish --registry=https://registry.npmjs.org`（`prepublishOnly` 自动跑测试）
-3. 推送 GitHub `main`
-4. 用户侧：`dsh plugin --profile web update dsh-privmask` 后**重启 dsh web**
+1. 改 `package.json` 版本（同步 `lib/client.js` / `client-src` 的 `PLUGIN_VERSION`、CHANGELOG）
+2. 本地验证：`node tools/smoke.mjs`（真实起一次 `dsh web`，断言插件挂载 + 卡片进模块表 + profile 装的就是这份代码；
+   需要本机已装 dsh 且 profile 里有本插件）+ 五套测试全绿
+3. 提交并推送 `main`
+4. 打 tag 触发发布：`git tag v<版本> && git push origin v<版本>`
+   —— `.github/workflows/publish.yml` 会校验 tag 与 `package.json` 一致、跑测试、`npm publish --provenance`
+   （npm Trusted Publishing / OIDC，不需要 2FA；版本已存在时自动跳过，tag 可安全重放）
+5. 写 GitHub Release（同版本的 CHANGELOG 段落即可）
+6. 用户侧：`dsh plugin --profile <profile> update dsh-privmask` 后**重启宿主**
+
+手动兜底（Trusted Publishing 未配置或 CI 不可用时）：
+
+```sh
+npm publish --registry=https://registry.npmjs.org --auth-type=web
+```
 
 ## PR 检查清单
 

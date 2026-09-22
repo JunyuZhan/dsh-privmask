@@ -1,0 +1,50 @@
+name: publish
+
+# 打 tag 即发布：`git tag v0.2.45 && git push origin v0.2.45`
+# 走 npm Trusted Publishing（OIDC），不需要 NPM_TOKEN，也不需要人工过 2FA。
+# 一次性前置：npm 包设置页 → Trusted Publisher → GitHub Actions：
+#   owner=JunyuZhan, repository=dsh-privmask, workflow=publish.yml（environment 留空）
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  id-token: write # npm provenance + Trusted Publishing 需要
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: tag 与 package.json 版本必须一致
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          echo "tag=$TAG package=$PKG"
+          [ "$TAG" = "$PKG" ] || { echo "::error::tag $TAG 与 package.json $PKG 不一致"; exit 1; }
+
+      - name: 该版本是否已发布
+        id: check
+        run: |
+          PKG="$(node -p "require('./package.json').version")"
+          if npm view "dsh-privmask@$PKG" version >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "npm 上已有 $PKG，跳过发布（tag 可安全重放）"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 依赖（宿主 peer）
+        if: steps.check.outputs.exists == 'false'
+        run: npm install --no-save @deepseek-ai/schemastery@^3.18.1 @deepseek-ai/cordis@^4.0.1
+
+      - name: 发布（prepublishOnly 会自动跑五套测试）
+        if: steps.check.outputs.exists == 'false'
+        run: npm publish --provenance --access public

@@ -3,6 +3,21 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [未发布]
+
+### 开发流程（发版自动化与冒烟）
+
+- 新增 `tools/smoke.mjs`（`npm run smoke`）：真实起一次 `dsh web`，断言四件踩过坑的事——
+  插件确实挂载（`[privmask] 适配检查`）、settings 命名空间已注册、客户端模块表含
+  `dsh-privmask/client.js`（界面能看到卡片）、profile 装的就是仓库这份代码（版本一致，
+  `--allow-version-drift` 可放宽）。不调模型、不花钱，退出码 0/1，进程分组清理无残留。
+- 新增 `.github/workflows/publish.yml`：打 tag（`v<版本>`）即发布——校验 tag 与
+  `package.json` 一致 → 跑测试 → `npm publish --provenance`，走 npm Trusted Publishing（OIDC），
+  不再需要人工过 2FA；npm 上已有该版本时自动跳过，tag 可安全重放。
+  ⚠️ 首次使用需在 npm 包设置页配置 Trusted Publisher（owner/repo/workflow=publish.yml）。
+- CONTRIBUTING 发布流程改为「smoke + 五套测试 → push → 打 tag → CI 发布 → 写 Release」，
+  并保留 `npm publish --auth-type=web` 作为手动兜底。
+
 ## [0.2.44] - 2026-09-22
 
 ### 修复（跨平台兼容）
