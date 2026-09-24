@@ -26,6 +26,8 @@ const value = (name, fallback) => {
 };
 
 const PROFILE = value('--profile', 'web');
+/** 允许指定 dsh 可执行文件（例如用临时安装的 0.1.7 验证新版宿主，而不动全局安装）。 */
+const DSH_BIN = value('--dsh', 'dsh');
 const ALLOW_DRIFT = flag('--allow-version-drift');
 const KEEP_OPEN = flag('--keep-open');
 const DSH_HOME = process.env.DSH_HOME || join(homedir(), '.dsh');
@@ -49,7 +51,7 @@ async function fetchIndex(url) {
   return second.text();
 }
 
-const child = spawn('dsh', ['--profile', PROFILE, '--no-open', '--port', '0'], {
+const child = spawn(DSH_BIN, ['--profile', PROFILE, '--no-open', '--port', '0'], {
   cwd: ROOT,
   detached: true, // 单独进程组，退出时整组清掉，避免留孤儿
   stdio: ['ignore', 'pipe', 'pipe'],

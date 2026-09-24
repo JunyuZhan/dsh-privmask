@@ -178,6 +178,35 @@ DSH Desktop（`desktop` profile）的客户端运行时没有 `remote.pluginInve
 这条链路的教训值得记住：**上游不保证服务名稳定**（`settingsScope` 活了三个小版本就没了），
 所以插件对宿主服务一律「软探测 + 可降级」，只有真的两个宿主都提供的服务才进模块级 `inject`。
 
+### 5.4 0.1.7 的 `volatile` 字段与「活引用盒」（真机实测 2026-09-24）
+
+把设置 API 换成 `SettingsForms` 之后，**光调 `configure({auto:true})` 还不够**——`describe()`
+只收录「schema 里至少有一个 `meta.volatile` 字段」的插件条目：
+
+```js
+// dsh-settings@0.1.7 的 volatileForm()
+if (schema.meta.volatile) return plainSchema(schema);
+if (schema.type === 'object') { /* 递归收集 volatile 子字段 */ }
+// 一个 volatile 字段都没有 → 返回 undefined → 该条目整条不进设置表单
+```
+
+所以插件必须把「想让用户在界面上改」的字段标成 `.volatile()`。踩到的坑：
+
+1. **`.volatile()` 不是普通标记**：`Schema.resolve` 命中 volatile 字段时会把值换成
+   `createVolatile(value)` → 一个冻结的**活引用盒** `{ get(), [write] }`（来自 `@deepseek-ai/cosmokit`）。
+   宿主就是这样把 config 交给插件的，所以插件的 `apply(ctx, config)` 拿到的 `config.enabled`
+   是盒子不是布尔；直接丢进自己的 schema 校验会报 `expected boolean but got [object Object]`
+   （我们在真机上就是这么崩的，插件整条激活失败）。
+2. **活引用本身就是 live 机制**：设置页写入时宿主直接写进盒子，插件无需 watch，只要在使用前
+   `get()` 一次即可；我们的做法是在每个水瀑钩子入口比较一次解盒后的配置签名，变了就重建引擎。
+3. **版本差异**：`Schema.prototype.volatile` 只在 schemastery ≥3.18.4（0.1.7 线）存在，
+   0.1.5 带的是 3.18.2 —— 直接调用会在**加载期**抛错。因此按能力派生
+   （`markVolatile()`：没有 `volatile` 方法就原样返回）。
+
+真机验证（2026-09-24）：dsh 0.1.7-rc.2 上卡片显示真实值（总开关/机关开关等），点开关后
+profile 的 `cordis.patch.yml` 出现 `redactNames: false` 等落盘值；dsh 0.1.5-rc.2 上仍走
+`register` + `settingsScope` 老路径，冒烟 8/8 通过。
+
 ## 6. 后续改进方向（按优先级）
 
 1. **展示还原**：推动 dsh 官方提供外层可见的会话读取/改写缝或映射 RPC；

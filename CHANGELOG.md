@@ -12,8 +12,13 @@
   软探测并适配成同一接口（describe/update），模块级 `inject` 只剩 `slots` + `locale`；
   两代都没有时卡片仍注册，只提示改用配置文件模式。
 - **宿主侧双栈**：`settings.register`（≤0.1.5，带 `watch` 做 live 重建）不存在时，
-  回落到 0.1.7 的 `settings.configure({ auto: true })`（SettingsForms 自动页，配置写回
-  profile 后由 loader 重载生效），不再只是"降级为配置文件模式"。
+  回落到 0.1.7 的 `settings.configure({ auto: true })`，不再只是"降级为配置文件模式"。
+- **0.1.7 的 `volatile` 字段语义**（真机踩出来的）：`SettingsForms` 只收录至少有一个
+  `meta.volatile` 字段的插件条目，而 volatile 字段的值会被宿主换成**活引用盒**
+  `{ get(), [write] }`——直接当普通值校验会报 `expected boolean but got [object Object]`、
+  插件整条激活失败。现在按能力派生 volatile 标记（schemastery ≤3.18.2 没有该方法，防御式调用），
+  校验前解盒，并在每个水瀑钩子入口比较一次配置签名，变了就重建引擎——
+  用户在卡片上改开关**无需重启**即生效，等价于旧宿主的 `watch`。
 - 回归：accuracy 固定断言 `inject = [slots, locale]`、新增「只有 remote.settings 时读写正常」
   与「两代都没有时卡片仍注册且报错可操作」；reliability 新增「0.1.7 形态 configure 被调用 +
   主链路仍脱敏」（193 → 195）。
@@ -29,6 +34,10 @@
   有漂移或关键缝缺失时 CI 报红并自动开/更新 issue。
 - 已核对并把 `0.1.5-rc.3` / `0.1.7-alpha.2` / `0.1.7-rc.2` 纳入已验证清单；
   README 版本适配段与 `docs/dsh-research.md` §5.3 记录了三代设置 API 的形态与策略。
+- **真机验证**：dsh `0.1.7-rc.2` 上卡片显示真实值（总开关/全面脱敏/机关开关），点击开关后
+  profile 的 `cordis.patch.yml` 落盘 `redactNames: false` 等值，宿主启动无「entry did not activate」
+  告警；dsh `0.1.5-rc.2` 上仍走 `register` + `settingsScope` 老路径，冒烟 8/8 通过。
+  回归：reliability 新增「volatile 活引用解盒 + 改盒值下一次请求即生效」（195 → 197）。
 
 ## [0.2.46] - 2026-09-22
 

@@ -248,6 +248,10 @@ node tools/redact-text.mjs input.txt out.txt --config cfg.json
   （0.1.7 的 SettingsForms）二选一。两代都没有时卡片仍注册，只在卡片内提示改用配置文件模式。
   客户端模块级 `inject` 因此只剩 `slots` / `locale` 两个各宿主都有的服务——硬依赖某个设置服务
   会让卡片整块停在 PENDING（issue #2 的教训，0.1.7 差点再犯一次）。
+- **0.1.7 的 `volatile` 字段是活引用**：0.1.7 只把标了 `.volatile()` 的字段放进设置表单，
+   而且把它们传成 `{ get(), [write] }` 盒子（不是普通值）。插件按能力派生 volatile 标记
+   （老 schemastery 没有该方法），校验前解盒、并在每个钩子入口探测一次变更——用户在卡片上
+   改开关**无需重启进程**即可生效。已在 dsh 0.1.7-rc.2 真机验证读写与落盘。
   核对方式是 `npm run dsh:compat`：按版本下载缝所在包到本机 `.dsh-versions/`
   （已 gitignore，只留存不提交），逐个断言缝仍存在并打印「版本 × 缝」矩阵，
   必需缝缺失即退出码 1；同一份缓存也可直接解两个版本做 diff。
@@ -320,7 +324,7 @@ node tools/redact-text.mjs input.txt out.txt --config cfg.json
 
 ```sh
 node test/self-test.js        # 15 项功能回归（端到端拦截 + 中文实体 + 法院保留/检察机关脱敏）
-node test/reliability-test.js # 195 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/base64文本预检/本地OCR兜底/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/settings-forms新形态/词表热更新/字符串 content 还原/出站脱敏/离境审计/审计摘要CLI/PDF预检CLI/PDF覆写脱敏/dsh0.1.5请求形态/跨平台CRLF与路径/病理输入时间上限）
+node test/reliability-test.js # 197 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/base64文本预检/本地OCR兜底/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/settings-forms新形态/volatile活引用/词表热更新/字符串 content 还原/出站脱敏/离境审计/审计摘要CLI/PDF预检CLI/PDF覆写脱敏/dsh0.1.5请求形态/跨平台CRLF与路径/病理输入时间上限）
 node test/accuracy-test.js    # 26 项准确性（法律文档矩阵/凭据/PII校验/证件与信用代码上下文/复姓/泛化机构与村镇/姓名标签边界/客户端版本一致性）
 node test/docx-test.js        # docx 本地脱敏（格式保留/非文本条目原样/占位符写入）
 node test/fuzz-test.js        # 300 例随机文本 × 2 断言（不崩 + 幂等，共 600 断言）

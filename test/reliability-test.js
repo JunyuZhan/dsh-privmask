@@ -1123,6 +1123,37 @@ const ag4Text = ag4.received ? ag4.received.messages[0].content.map((b) => (b.ty
 t('AG4 OCR 失败文本剥离 Windows/POSIX 路径', ag4Text.includes('图片本地OCR不可用') && !ag4Text.includes('C:\\Users') && !ag4Text.includes('/Users/apple'), ag4Text.slice(0, 160));
 
 // AH. 病理输入时间上限：规则全是正则，最怕回溯爆炸；把最坏形态的耗时钉住（阈值放宽到 5s 供 CI 用）
+// AI. 0.1.7 的 volatile 活引用：config 传的是 { get() } 盒，用户改设置后下一次请求即生效
+function liveRefHarness() {
+  const store = { enabled: true, redactNames: true, logRedactions: false };
+  let llmFn = null;
+  let received = null;
+  const llmStub = { stream(o) { received = o; return (async function* () { yield { type: 'finish', reason: { kind: 'stop' } }; })(); } };
+  const ctx = {
+    on(n, f) { if (n === 'llm/stream') llmFn = f; return () => {}; },
+    get(n) { return n === 'llm' ? llmStub : undefined; },
+    emit() {},
+    inject() { return () => {}; },
+  };
+  apply(ctx, Object.fromEntries(Object.entries(store).map(([key]) => [key, { get: () => store[key] }])));
+  return {
+    store,
+    async dispatch(text) {
+      received = null;
+      const opts = { provider: 't', model: 'm', sessionId: 's-live', messages: [{ role: 'user', content: [{ type: 'text', text }] }] };
+      const gen = llmFn(opts, () => { received = opts; return (async function* () { yield { type: 'finish', reason: { kind: 'stop' } }; })(); });
+      for await (const _ of gen) {}
+      return received.messages[0].content[0].text;
+    },
+  };
+}
+const AI = liveRefHarness();
+const ai1 = await AI.dispatch('原告 ' + S.name1 + ' 来访');
+t('AI1 volatile 活引用：初始值被正确解盒', ai1.includes('[REDACTED_NAME_') && !ai1.includes(S.name1), ai1);
+AI.store.enabled = false;
+const ai2 = await AI.dispatch('原告 ' + S.name1 + ' 来访');
+t('AI2 volatile 活引用：改盒值后下一次请求即生效（无需重启）', ai2.includes(S.name1) && !ai2.includes('REDACTED_'), ai2);
+
 const AH = makeHarness({ logRedactions: false });
 const ahCases = [
   ['长汉字无分隔', '张'.repeat(200000)],

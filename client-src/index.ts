@@ -107,9 +107,10 @@ export function apply(ctx: ClientContext): void {
     let snap: PrivmaskScopeSnapshot = { status: 'loading', writable: false }
     const refresh = async (): Promise<void> => {
       const res = await remote.settings.describe()
-      const ns = res && res.ok === true
-        ? (res.value?.namespaces ?? []).find((n) => n.ns === ENTRY)
-        : undefined
+      const list = res && res.ok === true ? (res.value?.namespaces ?? []) : []
+      // 表单 key 是 profile entry id：web/desktop 下是 privmask，打包成 bundle 时可能带前缀，
+      // 因此精确匹配优先、后缀匹配兜底（两者都没有才认为不可用）
+      const ns = list.find((n) => n.ns === ENTRY) ?? list.find((n) => typeof n.ns === 'string' && n.ns.endsWith('/' + ENTRY))
       snap = ns === undefined
         ? { status: 'unavailable', writable: false }
         : { status: 'ready', value: ns.value as Record<string, unknown>, revision: ns.revision, writable: res?.value?.writable === true }
