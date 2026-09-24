@@ -1124,6 +1124,20 @@ t('AG4 OCR 失败文本剥离 Windows/POSIX 路径', ag4Text.includes('图片本
 
 // AH. 病理输入时间上限：规则全是正则，最怕回溯爆炸；把最坏形态的耗时钉住（阈值放宽到 5s 供 CI 用）
 // AI. 0.1.7 的 volatile 活引用：config 传的是 { get() } 盒，用户改设置后下一次请求即生效
+// AJ. resolveConfig 是唯一入口：schemastery ≥3.18.4 上 Config() 会把 volatile 字段解析成活引用盒，
+//     直接当值用会炸（cfg.preserveValues.includes is not a function），所有内部消费者必须走 resolveConfig
+const { resolveConfig } = await import('../lib/index.js');
+const ajCfg = resolveConfig({ enabled: true, customTerms: ['欧阳雪'], nonTextPolicy: 'block' });
+t('AJ1 resolveConfig 解盒：值都是普通类型',
+  typeof ajCfg.enabled === 'boolean' && Array.isArray(ajCfg.customTerms) && Array.isArray(ajCfg.preserveValues)
+  && ajCfg.customTerms[0] === '欧阳雪' && ajCfg.nonTextPolicy === 'block',
+  JSON.stringify({ enabled: typeof ajCfg.enabled, terms: Array.isArray(ajCfg.customTerms), policy: ajCfg.nonTextPolicy }));
+t('AJ2 resolveConfig 也能吃活引用盒输入', (() => {
+  const boxed = { enabled: { get: () => false }, customTerms: { get: () => ['甲'] } };
+  const c = resolveConfig(boxed);
+  return c.enabled === false && c.customTerms[0] === '甲';
+})(), 'boxed → plain');
+
 function liveRefHarness() {
   const store = { enabled: true, redactNames: true, logRedactions: false };
   let llmFn = null;

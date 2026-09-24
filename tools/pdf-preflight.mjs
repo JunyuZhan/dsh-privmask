@@ -18,7 +18,7 @@ import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { randomUUID } from 'node:crypto'
-import { Config, ocrPythonPath } from '../lib/index.js'
+import { Config, ocrPythonPath, resolveConfig } from '../lib/index.js'
 import { createEngine } from '../lib/engine.js'
 import { gsCandidates, haveBin, resolveBin, INSTALL_HINT } from './bins.mjs'
 
@@ -97,7 +97,7 @@ async function ocrPage(pdf, page) {
   }
 }
 
-const engine = createEngine(Config(args.config))
+const engine = createEngine(resolveConfig(args.config))
 const rctx = { maps: new Map(), seq: new Map(), counts: new Map(), fields: 0 }
 const totals = { pages: 0, textPages: 0, ocrPages: 0, emptyPages: 0, redactedPages: 0 }
 const category = new Map()

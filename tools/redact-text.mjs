@@ -7,7 +7,7 @@
 
 import { readFile, writeFile } from 'node:fs/promises'
 import { basename, dirname, extname, join, resolve } from 'node:path'
-import { Config } from '../lib/index.js'
+import { Config, resolveConfig } from '../lib/index.js'
 import { createEngine } from '../lib/engine.js'
 
 const args = process.argv.slice(2)
@@ -38,7 +38,7 @@ if (resolve(output) === input) {
   process.exit(2)
 }
 
-const engine = createEngine(Config(config))
+const engine = createEngine(resolveConfig(config))
 const text = await readFile(input, 'utf8')
 const rctx = { maps: new Map(), seq: new Map(), counts: new Map(), fields: 0 }
 const r = engine.redactText(text, rctx)

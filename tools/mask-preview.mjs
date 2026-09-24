@@ -15,7 +15,7 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { Config } from '../lib/index.js';
+import { Config, resolveConfig } from '../lib/index.js';
 import { createEngine } from '../lib/engine.js';
 import { restoreChunkText } from '../lib/restore.js';
 
@@ -30,7 +30,7 @@ if (file !== undefined) {
   input = readFileSync(0, 'utf8'); // stdin
 }
 
-const cfg = Config({
+const cfg = resolveConfig({
   logRedactions: false,
   ...(facts ? { redactNames: true, redactCompanies: true, redactOrgs: true } : {}),
 });

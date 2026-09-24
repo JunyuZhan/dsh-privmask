@@ -37,7 +37,12 @@
 - **真机验证**：dsh `0.1.7-rc.2` 上卡片显示真实值（总开关/全面脱敏/机关开关），点击开关后
   profile 的 `cordis.patch.yml` 落盘 `redactNames: false` 等值，宿主启动无「entry did not activate」
   告警；dsh `0.1.5-rc.2` 上仍走 `register` + `settingsScope` 老路径，冒烟 8/8 通过。
-  回归：reliability 新增「volatile 活引用解盒 + 改盒值下一次请求即生效」（195 → 197）。
+  回归：reliability 新增「volatile 活引用解盒 + 改盒值下一次请求即生效 + `resolveConfig` 唯一入口」
+  （195 → 199）。
+- **所有内部消费者改走 `resolveConfig()`**：`Config()` 在 schemastery ≥3.18.4 上会把 volatile
+  字段解析成活引用盒，三个 CLI（text/docx/pdf×2/对照工具）直接用它会导致
+  `cfg.preserveValues.includes is not a function`（CI 的 Node 18/Windows/macOS 三个 job 同时抓到，
+  本地因为 node_modules 里还是 3.18.2 而没复现，现已把本地对齐到 3.18.4）。
 
 ## [0.2.46] - 2026-09-22
 

@@ -23,7 +23,7 @@ import { promisify } from 'node:util'
 import { randomUUID } from 'node:crypto'
 import { inflateSync, deflateSync } from 'node:zlib'
 import { tmpdir } from 'node:os'
-import { Config } from '../lib/index.js'
+import { Config, resolveConfig } from '../lib/index.js'
 import { createEngine } from '../lib/engine.js'
 import { gsCandidates, haveBin, resolveBin, INSTALL_HINT } from './bins.mjs'
 
@@ -214,7 +214,7 @@ async function rasterize(pdf, page, dpi, dir) {
   return { pngPath, ...decoded }
 }
 
-const engine = createEngine(Config(args.config))
+const engine = createEngine(resolveConfig(args.config))
 const rctx = { maps: new Map(), seq: new Map(), counts: new Map(), fields: 0 }
 const filesReport = []
 
