@@ -660,11 +660,12 @@ test('客户端产物与 manifest 跨版本一致性', async () => {
   if (missing.length > 0) {
     throw new Error('manifest 缺少跨版本公共客户端依赖: ' + missing.join(', '))
   }
-  if (!client.includes('"settingsScope"')) {
-    throw new Error('client.js 未使用跨版本 settingsScope 服务（仍依赖 remote.settings?）')
-  }
-  if (/["']remote\.settings["']/.test(client)) {
-    throw new Error('client.js 仍依赖 0.1.2 专属服务 remote.settings，官方包会停在 PENDING')
+  // 两代设置 API 都要能走：0.1.2–0.1.5 用 settingsScope，0.1.7+ 又换回 remote.settings。
+  // 关键是两者都只能出现在「软注入探针」里，绝不能进模块级 inject（下面 expectInject 会兜底）。
+  for (const api of ['settingsScope', 'remote.settings']) {
+    if (!client.includes(api)) {
+      throw new Error('client.js 缺少 ' + api + ' 的软探测：某一代宿主的开关会失效')
+    }
   }
 
   // —— 客户端数据层（无 DOM）：加载产物并驱动 list/describe/update ——
@@ -683,12 +684,15 @@ test('客户端产物与 manifest 跨版本一致性', async () => {
   })
   // remote.pluginInventory 必须是可选依赖：写进 inject 会让 desktop profile（DSH Desktop
   // 客户端无该服务）整个模块停在 PENDING、卡片永不注册（GitHub issue #2）
-  const expectInject = ['slots', 'locale', 'settingsScope']
+  // settingsScope 也不能硬依赖：0.1.7 起上游换成 remote.settings，硬依赖会让卡片再次 PENDING
+  const expectInject = ['slots', 'locale']
   if (JSON.stringify(clientMod.inject) !== JSON.stringify(expectInject)) {
     throw new Error('client inject 服务键不符: ' + JSON.stringify(clientMod.inject))
   }
-  if (clientMod.inject.includes('remote.pluginInventory')) {
-    throw new Error('client 仍硬依赖 remote.pluginInventory：desktop profile 会停在 PENDING')
+  for (const hardDep of ['remote.pluginInventory', 'settingsScope']) {
+    if (clientMod.inject.includes(hardDep)) {
+      throw new Error('client 仍硬依赖 ' + hardDep + '：该服务缺失的宿主会让卡片停在 PENDING')
+    }
   }
 
   function makeScope(initialValue, revision, opts = {}) {
@@ -714,6 +718,23 @@ test('客户端产物与 manifest 跨版本一致性', async () => {
     const dicts = {}
     const tabs = {}
     const withInventory = opts.withInventory !== false
+    const withSettingsScope = opts.withSettingsScope !== false
+    const withRemoteSettings = opts.withRemoteSettings === true
+    // 0.1.7+ 形态：remote.settings.describe()/update(ns, patch, revision)
+    const remoteState = { value: { ...cfgBase }, revision: 7, writable: true }
+    const remoteSettings = {
+      describe: async () => ({
+        ok: true,
+        value: { writable: remoteState.writable, hasDocument: true, namespaces: [{ ns: 'privmask', value: remoteState.value, revision: remoteState.revision }] },
+      }),
+      update: async (ns, patch, rev) => {
+        if (ns !== 'privmask') return { ok: false, error: { message: 'unknown namespace' } }
+        if (typeof rev === 'number' && rev !== remoteState.revision) return { ok: false, error: { message: 'revision conflict' } }
+        remoteState.value = { ...remoteState.value, ...patch }
+        remoteState.revision += 1
+        return { ok: true, value: { revision: remoteState.revision } }
+      },
+    }
     const ctx = {
       effect: (fn) => { fn(); return () => {} },
       locale: {
@@ -730,18 +751,22 @@ test('客户端产物与 manifest 跨版本一致性', async () => {
       // 软注入桩：web profile 有 remote.pluginInventory → 回调立即触发；
       // desktop profile 没有该服务 → 回调永不触发（且 ctx.remote 不可访问）
       inject: (deps, cb) => {
-        if (withInventory && Array.isArray(deps) && deps.includes('remote.pluginInventory')) cb(ctx)
+        const list = Array.isArray(deps) ? deps : []
+        if (withInventory && list.includes('remote.pluginInventory')) cb(ctx)
+        else if (withSettingsScope && list.includes('settingsScope')) cb(ctx)
+        else if (withRemoteSettings && list.includes('remote.settings')) cb(ctx)
         return () => {}
       },
-      settingsScope: { bind: () => scope },
     }
+    if (withSettingsScope && scope) ctx.settingsScope = { bind: () => scope }
+    const remote = {}
     if (withInventory) {
-      ctx.remote = {
-        pluginInventory: {
-          list: async () => ({ ok: true, value: { entries: [{ entryId: 'privmask-entry', moduleName: 'dsh-privmask', enabled: true, fiberPhase: 'active' }] } }),
-        },
+      remote.pluginInventory = {
+        list: async () => ({ ok: true, value: { entries: [{ entryId: 'privmask-entry', moduleName: 'dsh-privmask', enabled: true, fiberPhase: 'active' }] } }),
       }
     }
+    if (withRemoteSettings) remote.settings = remoteSettings
+    if (Object.keys(remote).length > 0) ctx.remote = remote
     clientMod.apply(ctx)
     const tab = tabs['settings.plugins.tab']
     if (!tab) throw new Error('未注册 settings.plugins.tab 卡片')
@@ -792,6 +817,28 @@ test('客户端产物与 manifest 跨版本一致性', async () => {
   const desktopList2 = await desktopCard2.inject().list()
   if (desktopList2.entries[0].enabled !== false) {
     throw new Error('desktop 场景 settings 不可用时应推断为「未启用」: ' + JSON.stringify(desktopList2))
+  }
+
+  // —— 0.1.7+ 形态：只有 remote.settings、没有 settingsScope 时，卡片照常读写 ——
+  const { cfg: modernCard } = makeCtx(null, { withSettingsScope: false, withRemoteSettings: true })
+  const modernProps = modernCard.inject()
+  const modernDescribe = await modernProps.describe()
+  if (modernDescribe.writable !== true || modernDescribe.namespaces[0].ns !== 'privmask' || modernDescribe.namespaces[0].revision !== 7) {
+    throw new Error('0.1.7 形态 describe 不符: ' + JSON.stringify(modernDescribe))
+  }
+  await modernProps.update('privmask', { redactNames: false }, 7)
+  const modernAfter = await modernProps.describe()
+  if (modernAfter.namespaces[0].value.redactNames !== false || modernAfter.namespaces[0].revision !== 8) {
+    throw new Error('0.1.7 形态 update 未生效: ' + JSON.stringify(modernAfter))
+  }
+
+  // —— 两代 API 都没有：卡片仍须注册（不能 PENDING），describe 给出可操作的错误 ——
+  const { cfg: bareCard } = makeCtx(null, { withSettingsScope: false })
+  if (bareCard.id !== 'privmask') throw new Error('无设置 API 时卡片未注册')
+  let bareError = ''
+  try { await bareCard.inject().describe() } catch (e) { bareError = String(e && e.message ? e.message : e) }
+  if (!bareError.includes('设置 API') || !bareError.includes('cordis.patch.yml')) {
+    throw new Error('无设置 API 时错误信息不可操作: ' + bareError)
   }
   const desktopDescribe = await desktopProps.describe()
   if (desktopDescribe.namespaces[0].value.enabled !== true) throw new Error('desktop 场景 describe 不可用')

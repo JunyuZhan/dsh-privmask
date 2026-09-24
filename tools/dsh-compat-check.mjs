@@ -52,11 +52,30 @@ const SEAMS = [
   { id: 'agent-loop 请求标记', pkg: '@deepseek-ai/dsh-agent-loop', needle: 'markAgentLoopRequest', required: true, note: '脱敏副本重入水瀑的放行前提' },
   { id: 'llm.resolveModelInfo', pkg: '@deepseek-ai/dsh-llm', needle: 'resolveModelInfo', required: false, note: 'localOcr 的图片模态改写' },
   { id: 'tools/ptc-dispatch-log', pkg: '@deepseek-ai/dsh-tools', needle: 'tools/ptc-dispatch-log', required: false, note: 'run_code 子派发日志遮罩（≥0.1.2）' },
-  { id: 'settings.register', pkg: '@deepseek-ai/dsh-settings', needle: 'register(ns, schema', required: false, note: '缺省时退化为配置文件模式' },
+  // 设置 API 是「卡片开关 live 生效」的命脉，且上游改过两次（0.1.2 前的 remote.settings →
+  // settingsScope → 0.1.7 又改回 remote.settings + host 的 SettingsForms）。任一形态都在即可，
+  // 但全都找不到就说明这条链路断了，必须报红：critical
+  {
+    id: 'host 设置 API',
+    critical: true,
+    note: '注册命名空间（旧 register）或表单页（新 configure）都没有时，开关只能靠配置文件',
+    any: [
+      { pkg: '@deepseek-ai/dsh-settings', needle: 'register(ns, schema' },
+      { pkg: '@deepseek-ai/dsh-settings', needle: 'configure(presentation' },
+    ],
+  },
+  {
+    id: '客户端设置 API',
+    critical: true,
+    note: 'settingsScope（0.1.2–0.1.5）与 remote.settings（0.1.7+）都没有时，卡片开关无法读写',
+    any: [
+      { pkg: '@deepseek-ai/dsh-client-ui-settings', needle: 'settingsScope' },
+      { pkg: '@deepseek-ai/dsh-api-remotes', needle: 'settings/update' },
+    ],
+  },
   { id: 'session-id 请求头', pkg: '@deepseek-ai/dsh-llm-deepseek', needle: 'x-deepseek-harness-session-id', required: false, note: 'dropSessionId 的移除对象' },
   { id: 'attachments.readImage', pkg: '@deepseek-ai/dsh-attachment-local', needle: 'readImage', required: false, note: 'localOcr 读取图片字节' },
   { id: 'pluginInventory', pkg: '@deepseek-ai/dsh-api-remotes', needle: 'pluginInventory', required: false, note: '卡片读取插件清单' },
-  { id: 'settingsScope', pkg: '@deepseek-ai/dsh-client-ui-settings', needle: 'settingsScope', required: false, note: '卡片读写开关' },
 ];
 
 /** 递归收集文本文件（只扫源码/类型，跳过大目录）。 */
@@ -121,8 +140,56 @@ async function ensurePackage(name, version, versionDir) {
   return { ok: true, cached: false, dir: target };
 }
 
+/** 我们已经逐缝核对过、并写进 README 的宿主版本；`--upstream` 用它判断「上游是否出现未核对版本」。 */
+const VERIFIED_VERSIONS = ['0.1.1-rc.2', '0.1.5-rc.2', '0.1.5-rc.3', '0.1.6-alpha.2', '0.1.7-alpha.2', '0.1.7-rc.2'];
+
+const upstreamOnly = process.argv.includes('--upstream');
+const alsoCheck = process.argv.includes('--check');
 const versions = process.argv.slice(2).filter((a) => !a.startsWith('-'));
-const targets = versions.length > 0 ? versions : DEFAULT_VERSIONS;
+
+/** 上游有没有出现我们没核对过的版本（latest / next / alpha 三个 tag）。 */
+async function upstreamDrift() {
+  const res = await fetch('https://registry.npmjs.org/@deepseek-ai%2Fdsh', { headers: { accept: 'application/json' } });
+  if (!res.ok) throw new Error('查询上游版本失败：HTTP ' + res.status);
+  const meta = await res.json();
+  const tags = meta['dist-tags'] || {};
+  const drifted = [];
+  console.log('[privmask] 上游 dist-tags: ' + JSON.stringify(tags));
+  for (const [tag, version] of Object.entries(tags)) {
+    if (VERIFIED_VERSIONS.includes(version)) {
+      console.log('  ✓ ' + tag + ' = ' + version + '（已核对）');
+    } else {
+      drifted.push({ tag, version });
+      console.log('  ⚠ ' + tag + ' = ' + version + '（未核对：不在已验证清单里）');
+    }
+  }
+  return drifted;
+}
+
+let targets = versions.length > 0 ? versions : DEFAULT_VERSIONS;
+let driftFound = false;
+if (upstreamOnly) {
+  const drifted = await upstreamDrift().catch((error) => {
+    console.error('[privmask] ' + (error && error.message ? error.message : error));
+    process.exitCode = 1;
+    return [];
+  });
+  if (drifted.length > 0) {
+    if (alsoCheck) {
+      driftFound = true;
+      targets = [...new Set(drifted.map((d) => d.version))];
+      console.log('\n对未核对版本跑逐缝核对：' + targets.join(', '));
+    } else {
+      console.error('\n[privmask] 上游出现未核对版本：' + drifted.map((d) => d.tag + '=' + d.version).join(', ')
+        + '\n  处理：node tools/dsh-compat-check.mjs ' + drifted.map((d) => d.version).join(' ')
+        + '，核对通过后把版本加进本脚本的 VERIFIED_VERSIONS 与 README 的版本适配段');
+      process.exit(1);
+    }
+  } else {
+    console.log('[privmask] 上游三个 tag 都在已验证清单内');
+    if (!alsoCheck) process.exit(0);
+  }
+}
 
 mkdirSync(CACHE_DIR, { recursive: true });
 console.log('[privmask] dsh 适配自检：版本 ' + targets.join(', ') + '，源码留存目录 ' + relative(ROOT, CACHE_DIR) + '/');
@@ -142,21 +209,27 @@ for (const version of targets) {
   }
   console.log('\n=== dsh ' + version + ' ===');
   for (const seam of SEAMS) {
-    const pkg = present.get(seam.pkg);
-    if (!pkg || !pkg.ok) {
-      const line = '  ' + (seam.required ? '✗' : '–') + ' ' + seam.id + '（' + seam.pkg + ' 不可用）';
-      console.log(line);
-      if (seam.required) failures += 1;
-      continue;
+    // 一条「缝」可以有多种可接受形态（上游改过 API 名的地方），任一形态命中即算通过
+    const parts = seam.any ?? [{ pkg: seam.pkg, needle: seam.needle }];
+    const found = [];
+    const missing = [];
+    for (const part of parts) {
+      const pkg = present.get(part.pkg);
+      if (!pkg || !pkg.ok) { missing.push(part.pkg); continue; }
+      const hits = grepPackage(pkg.dir, part.needle);
+      if (hits.length > 0) found.push({ pkg: part.pkg, hits, index: parts.indexOf(part) });
+      else missing.push(part.pkg.replace('@deepseek-ai/', '') + '#' + part.needle);
     }
-    const hits = grepPackage(pkg.dir, seam.needle);
-    if (hits.length === 0 && seam.required) {
+    const must = seam.required === true || seam.critical === true;
+    if (found.length > 0) {
+      const f = found[0];
+      console.log('  ✓ ' + seam.id + '  ' + f.hits[0] + (f.hits.length > 1 ? ' 等 ' + f.hits.length + ' 处' : '')
+        + (seam.any && f.index > 0 ? '（该版本用的是新版形态）' : ''));
+    } else if (must) {
       failures += 1;
-      console.log('  ✗ ' + seam.id + ' 缺失（' + seam.pkg + '）：' + seam.note);
-    } else if (hits.length === 0) {
-      console.log('  – ' + seam.id + ' 该版本没有（降级）：' + seam.note);
+      console.log('  ✗ ' + seam.id + ' 缺失（' + missing.join(', ') + '）：' + seam.note);
     } else {
-      console.log('  ✓ ' + seam.id + '  ' + hits[0] + (hits.length > 1 ? ' 等 ' + hits.length + ' 处' : ''));
+      console.log('  – ' + seam.id + ' 该版本没有（降级）：' + seam.note);
     }
   }
   // 声明的浏览器端模块依赖：某条线上不存在时不报错（宿主模块表按「未知条目跳过」处理），
@@ -175,6 +248,11 @@ for (const version of targets) {
 
 if (failures > 0) {
   console.error('\n[privmask] 适配自检失败：' + failures + ' 个必需缝缺失，插件需要适配后再发布');
+  process.exitCode = 1;
+} else if (driftFound) {
+  // 缝都在 = 新版本可以直接用，但清单还没更新；仍然报红，提醒把版本补进 VERIFIED_VERSIONS 与 README
+  console.error('\n[privmask] 上游新版本的宿主缝都在（可直接用），但版本尚未纳入已验证清单：'
+    + targets.join(', ') + '\n  处理：把版本加进 tools/dsh-compat-check.mjs 的 VERIFIED_VERSIONS 与 README 的版本适配段');
   process.exitCode = 1;
 } else {
   console.log('\n[privmask] 适配自检通过：必需缝全部存在；源码已留存于 ' + relative(ROOT, CACHE_DIR) + '/（不进提交）');

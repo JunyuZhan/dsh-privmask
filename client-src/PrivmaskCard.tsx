@@ -76,7 +76,7 @@ export const DSH_SUPPORT = 'dsh 0.1.0-rc.6+（0.1.1-rc.2 / 0.1.5-rc.2 / 0.1.6-al
 /** 免责声明（完整版见 README「责任与边界」） */
 export const DISCLAIMER = '脱敏为启发式本地处理，无法保证零漏检；重要数据请自行评估并保留原文。'
 /** 插件版本（与 package.json 同步；accuracy 测试强制一致，避免发版漂移） */
-export const PLUGIN_VERSION = '0.2.46'
+export const PLUGIN_VERSION = '0.2.47'
 
 export function PrivmaskCard(props: PrivmaskCardInjected) {
   const [enabled, setEnabled] = useState<boolean | null>(null)

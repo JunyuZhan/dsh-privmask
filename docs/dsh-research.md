@@ -147,6 +147,37 @@ DSH Desktop（`desktop` profile）的客户端运行时没有 `remote.pluginInve
 5. 宿主一直没有该服务时（desktop），回调不触发 → 超时后按降级路径显示「状态未知」，
    卡片其余能力不受影响。
 
+## 5.3 设置 API 的三代形态与我们的适配（2026-09-24）
+
+上游在 09-22～09-24 连发 5 个版本（0.1.5-rc.3、0.1.7-alpha.1/2、0.1.7-rc.1/2），
+其中 0.1.7 线**把设置 API 换掉了**——这是插件最容易被打断的一条链路，因为它决定
+「卡片能不能注册」和「开关能不能 live 生效」两件事。
+
+| 代次 | 宿主侧 | 客户端侧 |
+|---|---|---|
+| 0.1.0–0.1.1（旧官方线） | `ctx.settings.register(ns, schema, opts)` + `scope.watch` | `remote.settings`（当时未采用） |
+| 0.1.2–0.1.5 | 同上 | `settingsScope.bind({namespace})` → getSnapshot/subscribe/set |
+| 0.1.7+ | `ctx.settings.configure({auto})`（`SettingsForms`：describe/update/mutate/replace） | `remote.settings.describe()/update(ns, patch, revision)` |
+
+适配策略（0.2.47 起）：
+
+1. **客户端模块级 `inject` 只保留 `slots` + `locale`**——硬依赖设置服务的代价是整块 PENDING、
+   卡片直接消失（issue #2 的失败模式）。`settingsScope` 与 `remote.settings` 都改为 `ctx.inject`
+   软探测，先到先用；两代都没有时卡片仍注册，`describe()` 抛「请改用配置文件模式」的可操作错误。
+2. **两代客户端 API 适配成同一个最小接口**（getSnapshot/subscribe/set）：旧形态直接包
+   `settingsScope`；新形态用 `remote.settings.describe()`（返回 `{writable, namespaces[]}`，
+   与旧快照结构天然兼容）读、`update(ns, patch, revision)` 写，写完刷新快照。
+   卡片组件代码因此一行未改。
+3. **宿主侧双栈**：`settings.register` 在就调用（旧线，带 `watch` 做 live 重建引擎）；
+   否则若 `settings.configure` 在，就 `configure({ auto: true })` 声明自动页——新形态下
+   配置写回 profile 后由 loader 重新 apply 插件，等价于 live 生效。
+4. **监控**：`tools/dsh-compat-check.mjs` 把设置 API 标为 `critical`（用 `any` 表达
+   「任一形态命中即通过」），并新增 `--upstream` 漂移检查；`.github/workflows/watch-upstream.yml`
+   每天跑一次，发现未核对版本或关键 API 消失就开 issue。
+
+这条链路的教训值得记住：**上游不保证服务名稳定**（`settingsScope` 活了三个小版本就没了），
+所以插件对宿主服务一律「软探测 + 可降级」，只有真的两个宿主都提供的服务才进模块级 `inject`。
+
 ## 6. 后续改进方向（按优先级）
 
 1. **展示还原**：推动 dsh 官方提供外层可见的会话读取/改写缝或映射 RPC；

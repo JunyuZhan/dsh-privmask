@@ -1,0 +1,46 @@
+name: watch-upstream
+
+# 定时盯着上游 dsh：出现未核对的新版本、或关键宿主缝/设置 API 消失时报警并开 issue。
+# 之前完全没有这类监控——上游 09-22~09-24 连发 5 个版本（含把设置 API 从 settingsScope
+# 换成 remote.settings）我们是事后才知道的。
+on:
+  schedule:
+    - cron: '0 1 * * *' # 每天 09:00（北京时间）
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: 上游版本漂移 + 逐缝核对
+        run: node tools/dsh-compat-check.mjs --upstream --check
+      - name: 有情况就开/更新 issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TITLE="上游 dsh 有新版本或宿主缝变化（需核对）"
+          BODY="$(printf '%s\n' \
+            "定时巡检（\`.github/workflows/watch-upstream.yml\`）在 \`$(date -u +%Y-%m-%dT%H:%MZ)\` 发现上游变化。" \
+            "" \
+            "详见本次运行日志：$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            "" \
+            "处理步骤：" \
+            "1. \`node tools/dsh-compat-check.mjs <新版本>\` 看逐缝结果；" \
+            "2. 缝都在 → 把版本补进 \`tools/dsh-compat-check.mjs\` 的 \`VERIFIED_VERSIONS\` 与 README 版本适配段；缺关键缝 → 按提示适配代码；" \
+            "3. 关键 API（尤其设置 API）换形态时，按 \`docs/dsh-research.md\` 的记录同步客户端/宿主侧软探测。" \
+            "")"
+          EXISTING="$(gh issue list --state open --search "\"$TITLE\" in:title" --json number -q '.[0].number')"
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "$BODY"
+          else
+            gh issue create --title "$TITLE" --body "$BODY"
+          fi

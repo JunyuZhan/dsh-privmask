@@ -868,6 +868,32 @@ function settingsHarness(config) {
 }
 const XH = settingsHarness({ logRedactions: false });
 t('X1 settings 命名空间注册', XH.registered !== null && XH.registered.ns === 'privmask' && XH.registered.options.applies === 'live' && typeof XH.watchCb === 'function', JSON.stringify(XH.registered && XH.registered.ns));
+// 0.1.7+ 形态：settings 服务没有 register，只有 configure（SettingsForms）→ 应声明自动页而不是报错
+function formsSettingsHarness() {
+  let configureArgs = null;
+  let llmFn = null;
+  let received = null;
+  const llmStub = { stream(o) { received = o; return (async function* () { yield { type: 'finish', reason: { kind: 'stop' } }; })(); } };
+  const ctx = {
+    on(n, f) { if (n === 'llm/stream') llmFn = f; return () => {}; },
+    get(n) { return n === 'llm' ? llmStub : n === 'settings' ? { configure: (a) => { configureArgs = a; return () => {}; } } : undefined; },
+    inject(deps, cb) { if (Array.isArray(deps) && deps.includes('settings')) cb({ settings: { configure: (a) => { configureArgs = a; return () => {}; } } }); return () => {}; },
+    emit() {},
+  };
+  apply(ctx, { logRedactions: false });
+  return { get configureArgs() { return configureArgs; }, async dispatch(text) {
+    received = null;
+    const opts = { provider: 't', model: 'm', sessionId: 's-forms', messages: [{ role: 'user', content: [{ type: 'text', text }] }] };
+    const gen = llmFn(opts, () => { received = opts; return (async function* () { yield { type: 'finish', reason: { kind: 'stop' } }; })(); });
+    for await (const _ of gen) {}
+    return received.messages[0].content[0].text;
+  } };
+}
+const XF = formsSettingsHarness();
+t('X1b 0.1.7 形态：settings.configure({auto:true}) 被调用且不报错',
+  XF.configureArgs !== null && XF.configureArgs.auto === true, JSON.stringify(XF.configureArgs));
+t('X1c 0.1.7 形态：主链路脱敏不受影响',
+  (await XF.dispatch('邮箱 ' + S.email)).includes('[REDACTED_EMAIL_'), 'forms 形态下仍脱敏');
 const x1 = await XH.dispatch('邮箱 ' + S.email);
 t('X2 初始配置生效-脱敏', x1.includes('[REDACTED_EMAIL_') && !x1.includes(S.email), x1);
 // 模拟用户在界面关掉总开关：watch 触发 → 引擎重建 → 不再脱敏

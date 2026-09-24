@@ -30,8 +30,10 @@ const en: Record<string, string> = {
  * `remote.pluginInventory` **不能**写进这份清单：DSH Desktop（desktop profile）的客户端运行时
  * 没有该服务，硬声明会让整个模块停在 PENDING、卡片永不注册（issue #2）。它是可选依赖，
  * 改为下面按能力软注入，拿不到时卡片降级为「插件状态未知」。
+ * `settingsScope` 同理不能硬声明：0.1.7 起上游把客户端设置 API 换成了 `remote.settings`，
+ * 它现在也走软注入（见 resolveScope），两代 API 任一可用即可，都没有时卡片仍注册、只提示用配置文件模式。
  */
-export const inject = ['slots', 'locale', 'settingsScope']
+export const inject = ['slots', 'locale']
 
 /** 注册隐私保护卡片到 设置→插件 页签。 */
 export function apply(ctx: ClientContext): void {
@@ -75,7 +77,7 @@ export function apply(ctx: ClientContext): void {
     }
   })
 
-  /** settingsScope 命名空间作用域：官方 0.1.0-rc.6+ 与 0.1.2 开发线通用。 */
+  /** 卡片读写设置用的最小作用域接口：两代宿主 API 都适配成它。 */
   interface PrivmaskScopeSnapshot {
     status: 'loading' | 'ready' | 'unavailable'
     value?: Record<string, unknown>
@@ -87,11 +89,89 @@ export function apply(ctx: ClientContext): void {
     subscribe(listener: () => void): () => void
     set(field: string, value: unknown): Promise<void>
   }
-  const scope = (ctx as unknown as { settingsScope: { bind(spec: { namespace: string }): PrivmaskScope } })
-    .settingsScope.bind({ namespace: 'privmask' })
+  const ENTRY = 'privmask'
+
+  /** 旧形态（0.1.2–0.1.5）：settingsScope.bind({namespace}) */
+  function scopeFromSettingsScope(svc: { bind(spec: { namespace: string }): PrivmaskScope }): PrivmaskScope {
+    return svc.bind({ namespace: ENTRY })
+  }
+
+  /** 新形态（0.1.7+）：remote.settings.describe()/update(ns, patch, revision)，适配成同一接口 */
+  function scopeFromRemoteSettings(remote: {
+    settings: {
+      describe(): Promise<{ ok: boolean; value?: { writable?: boolean; namespaces?: Array<{ ns: string; value: unknown; revision: number }> }; error?: { message?: string } }>
+      update(ns: string, patch: Record<string, unknown>, revision?: number): Promise<{ ok: boolean; value?: { revision?: number }; error?: { message?: string } }>
+    }
+  }): PrivmaskScope {
+    const listeners = new Set<() => void>()
+    let snap: PrivmaskScopeSnapshot = { status: 'loading', writable: false }
+    const refresh = async (): Promise<void> => {
+      const res = await remote.settings.describe()
+      const ns = res && res.ok === true
+        ? (res.value?.namespaces ?? []).find((n) => n.ns === ENTRY)
+        : undefined
+      snap = ns === undefined
+        ? { status: 'unavailable', writable: false }
+        : { status: 'ready', value: ns.value as Record<string, unknown>, revision: ns.revision, writable: res?.value?.writable === true }
+      for (const l of listeners) l()
+    }
+    void refresh().catch(() => {
+      snap = { status: 'unavailable', writable: false }
+      for (const l of listeners) l()
+    })
+    return {
+      getSnapshot: () => snap,
+      subscribe: (l) => {
+        listeners.add(l)
+        return () => { listeners.delete(l) }
+      },
+      set: async (field, value) => {
+        const res = await remote.settings.update(ENTRY, { [field]: value }, snap.revision)
+        if (!res || res.ok !== true) {
+          throw new Error('settings.update failed: ' + String(res?.error?.message ?? 'unknown'))
+        }
+        await refresh()
+      },
+    }
+  }
+
+  /** 按宿主能力选一套设置 API；两代都没有时保持 undefined，卡片仍注册但开关会给出明确错误。 */
+  let scope: PrivmaskScope | undefined
+  const scopeReady = new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, 2000)
+    let pending = 2
+    const done = () => { if (--pending === 0) { clearTimeout(timer); resolve() } }
+    const probe = (deps: string[], pick: (sctx: unknown) => PrivmaskScope | undefined) => {
+      try {
+        ctx.inject(deps, (sctx) => {
+          try {
+            const candidate = pick(sctx)
+            if (candidate !== undefined && scope === undefined) scope = candidate
+          } catch { /* 该宿主未暴露对应命名空间 */ }
+          done()
+        })
+      } catch { done() }
+    }
+    probe(['settingsScope'], (sctx) => {
+      const svc = (sctx as { settingsScope?: { bind(spec: { namespace: string }): PrivmaskScope } }).settingsScope
+      return svc === undefined ? undefined : scopeFromSettingsScope(svc)
+    })
+    probe(['remote', 'remote.settings'], (sctx) => {
+      const remote = (sctx as { remote?: { settings?: unknown } }).remote
+      return remote?.settings === undefined ? undefined : scopeFromRemoteSettings(remote as Parameters<typeof scopeFromRemoteSettings>[0])
+    })
+  })
+  const requireScope = async (): Promise<PrivmaskScope> => {
+    await scopeReady
+    if (scope === undefined) {
+      throw new Error('宿主未提供设置 API（既无 settingsScope 也无 remote.settings）：请改用配置文件模式（$DSH_HOME/profiles/<profile>/cordis.patch.yml）')
+    }
+    return scope
+  }
 
   /** 等 scope 首次就绪；4 秒超时降级为“配置文件模式”可见错误。 */
   const waitReady = async (): Promise<PrivmaskScopeSnapshot> => {
+    const scope = await requireScope()
     const current = scope.getSnapshot()
     if (current.status === 'ready' || current.status === 'unavailable') return current
     return new Promise((resolve, reject) => {
@@ -156,11 +236,12 @@ export function apply(ctx: ClientContext): void {
       throw new Error(`settings.update failed: unknown namespace ${ns}`)
     }
     void rev // scope.set 内部以最新已知 revision 作为 expectedRevision，比卡片持有的更可靠
-    const before = scope.getSnapshot()
+    const s = await requireScope()
+    const before = s.getSnapshot()
     for (const [key, value] of Object.entries(patch)) {
-      await scope.set(key, value)
+      await s.set(key, value)
     }
-    const after = scope.getSnapshot()
+    const after = s.getSnapshot()
     if (after.revision === before.revision) {
       throw new Error('settings.update failed: 写入未生效（版本冲突或权限不足）')
     }

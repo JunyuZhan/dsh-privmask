@@ -3,6 +3,33 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.47] - 2026-09-24
+
+### 兼容性（上游 0.1.7 换了设置 API）
+
+- **客户端不再硬依赖 `settingsScope`**：0.1.7 起上游把客户端设置 API 换成 `remote.settings`，
+  硬依赖会让卡片整块停在 PENDING（issue #2 的老失败模式）。现在两代 API 都走 `ctx.inject`
+  软探测并适配成同一接口（describe/update），模块级 `inject` 只剩 `slots` + `locale`；
+  两代都没有时卡片仍注册，只提示改用配置文件模式。
+- **宿主侧双栈**：`settings.register`（≤0.1.5，带 `watch` 做 live 重建）不存在时，
+  回落到 0.1.7 的 `settings.configure({ auto: true })`（SettingsForms 自动页，配置写回
+  profile 后由 loader 重载生效），不再只是"降级为配置文件模式"。
+- 回归：accuracy 固定断言 `inject = [slots, locale]`、新增「只有 remote.settings 时读写正常」
+  与「两代都没有时卡片仍注册且报错可操作」；reliability 新增「0.1.7 形态 configure 被调用 +
+  主链路仍脱敏」（193 → 195）。
+
+### 上游监控（此前完全没有）
+
+- 新增 `node tools/dsh-compat-check.mjs --upstream [--check]`：查上游 `dist-tags`，
+  出现不在 `VERIFIED_VERSIONS` 里的版本就报红（`--check` 会顺带跑逐缝核对）。
+- 设置 API 在自检里升级为 `critical`，且支持「任一形态命中即通过」
+  （旧 `register` / 新 `configure`，旧 `settingsScope` / 新 `remote.settings`）——
+  之前它们被标为可选，0.1.7 的缺失只打印成降级、退出码仍是 0，等于漏报。
+- 新增 `.github/workflows/watch-upstream.yml`：每天 09:00（北京时间）自动巡检，
+  有漂移或关键缝缺失时 CI 报红并自动开/更新 issue。
+- 已核对并把 `0.1.5-rc.3` / `0.1.7-alpha.2` / `0.1.7-rc.2` 纳入已验证清单；
+  README 版本适配段与 `docs/dsh-research.md` §5.3 记录了三代设置 API 的形态与策略。
+
 ## [0.2.46] - 2026-09-22
 
 ### 稳定性

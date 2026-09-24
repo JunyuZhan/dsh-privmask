@@ -243,6 +243,11 @@ node tools/redact-text.mjs input.txt out.txt --config cfg.json
 ## 版本适配与升级策略
 
 - **已实测核对的宿主版本**：0.1.1-rc.2（旧官方线）、0.1.5-rc.2（当前 latest）与 0.1.6-alpha.2（alpha）。
+- **设置 API 有三代形态，插件全部软探测**：`settingsScope`（0.1.2–0.1.5）与 `remote.settings`
+  （0.1.7+ 又改回来）在客户端二选一；宿主侧 `settings.register`（旧）与 `settings.configure`
+  （0.1.7 的 SettingsForms）二选一。两代都没有时卡片仍注册，只在卡片内提示改用配置文件模式。
+  客户端模块级 `inject` 因此只剩 `slots` / `locale` 两个各宿主都有的服务——硬依赖某个设置服务
+  会让卡片整块停在 PENDING（issue #2 的教训，0.1.7 差点再犯一次）。
   核对方式是 `npm run dsh:compat`：按版本下载缝所在包到本机 `.dsh-versions/`
   （已 gitignore，只留存不提交），逐个断言缝仍存在并打印「版本 × 缝」矩阵，
   必需缝缺失即退出码 1；同一份缓存也可直接解两个版本做 diff。
@@ -315,7 +320,7 @@ node tools/redact-text.mjs input.txt out.txt --config cfg.json
 
 ```sh
 node test/self-test.js        # 15 项功能回归（端到端拦截 + 中文实体 + 法院保留/检察机关脱敏）
-node test/reliability-test.js # 193 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/base64文本预检/本地OCR兜底/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/词表热更新/字符串 content 还原/出站脱敏/离境审计/审计摘要CLI/PDF预检CLI/PDF覆写脱敏/dsh0.1.5请求形态/跨平台CRLF与路径/病理输入时间上限）
+node test/reliability-test.js # 195 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/base64文本预检/本地OCR兜底/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/settings-forms新形态/词表热更新/字符串 content 还原/出站脱敏/离境审计/审计摘要CLI/PDF预检CLI/PDF覆写脱敏/dsh0.1.5请求形态/跨平台CRLF与路径/病理输入时间上限）
 node test/accuracy-test.js    # 26 项准确性（法律文档矩阵/凭据/PII校验/证件与信用代码上下文/复姓/泛化机构与村镇/姓名标签边界/客户端版本一致性）
 node test/docx-test.js        # docx 本地脱敏（格式保留/非文本条目原样/占位符写入）
 node test/fuzz-test.js        # 300 例随机文本 × 2 断言（不崩 + 幂等，共 600 断言）
@@ -333,7 +338,13 @@ CI（GitHub Actions）在每次 push / PR 时跑三个 job：
 ```sh
 npm run dsh:compat                 # 核对 0.1.1-rc.2 与 0.1.5-rc.2
 npm run dsh:compat -- 0.1.6-alpha.2   # 核对指定版本（已核对，结论同上）
+npm run dsh:compat -- --upstream   # 只看上游 dist-tags 是否出现未核对的新版本（定时监控用）
 ```
+
+**上游监控**：`.github/workflows/watch-upstream.yml` 每天 09:00（北京时间）跑一次
+`--upstream --check`——上游出现未核对版本、或关键宿主缝/设置 API 消失时，CI 报红并自动
+开（或追加评论到）一条 issue。已核对的版本清单维护在 `tools/dsh-compat-check.mjs` 的
+`VERIFIED_VERSIONS` 里。
 
 发版冒烟（需要本机已装 dsh 且 profile 里装了本插件；不调模型、不花钱）：
 
