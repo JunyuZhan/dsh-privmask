@@ -11,7 +11,7 @@
  * 不调用模型、不产生费用、不需要浏览器。用法：
  *   node tools/smoke.mjs [--profile web] [--allow-version-drift] [--keep-open]
  */
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
@@ -51,11 +51,23 @@ async function fetchIndex(url) {
   return second.text();
 }
 
-const child = spawn(DSH_BIN, ['--profile', PROFILE, '--no-open', '--port', '0'], {
-  cwd: ROOT,
-  detached: true, // 单独进程组，退出时整组清掉，避免留孤儿
-  stdio: ['ignore', 'pipe', 'pipe'],
-});
+const APP_ARGS = ['--profile', PROFILE, '--no-open', '--port', '0'];
+
+/**
+ * Windows 上 `dsh` 是 `dsh.cmd`（DSH Desktop 自带的 CLI 就是这种），Node 不能直接 spawn
+ * .cmd/.bat（会抛 EINVAL），必须交给 cmd.exe；否则「在桌面版上验证安装」这一步根本跑不起来。
+ */
+const WINDOWS_SHIM = process.platform === 'win32' && /\.(cmd|bat)$/i.test(DSH_BIN);
+const quoteWin = (arg) => (/[\s"&|<>^]/.test(arg) ? '"' + arg.replace(/"/g, '\\"') + '"' : arg);
+/** cmd /d /s /c 的常规写法：整条命令再包一层引号（npm 在 Windows 上就是这么调 .cmd 的）。 */
+const WINDOWS_COMMAND = '"' + [DSH_BIN, ...APP_ARGS].map(quoteWin).join(' ') + '"';
+const child = WINDOWS_SHIM
+  ? spawn(
+    process.env.ComSpec || 'cmd.exe',
+    ['/d', '/s', '/c', WINDOWS_COMMAND],
+    { cwd: ROOT, detached: true, stdio: ['ignore', 'pipe', 'pipe'], windowsVerbatimArguments: true },
+  )
+  : spawn(DSH_BIN, APP_ARGS, { cwd: ROOT, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
 
 let log = '';
 child.stdout.on('data', (d) => { log += d.toString(); });
@@ -65,6 +77,17 @@ child.on('exit', (code, signal) => { exited = { code, signal }; });
 
 function stopChild() {
   if (exited !== null || child.pid === undefined) return;
+  if (process.platform === 'win32') {
+    // Windows 没有 POSIX 进程组，用 taskkill /T 清整个子进程树（cmd.exe → Electron）
+    try {
+      spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+    } catch { /* 已退出 */ }
+    const until = Date.now() + 5000;
+    while (Date.now() < until && exited === null) {
+      try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100); } catch { /* ignore */ }
+    }
+    return;
+  }
   for (const sig of ['SIGTERM', 'SIGKILL']) {
     try { process.kill(-child.pid, sig); } catch { /* 已退出 */ }
     if (exited !== null) return;

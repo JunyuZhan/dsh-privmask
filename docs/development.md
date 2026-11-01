@@ -55,6 +55,15 @@ npm run smoke                      # 默认 --profile web
 npm run smoke -- --profile desktop # 指定 profile
 ```
 
+桌面版（Windows 上 `dsh` 只有 `.cmd`，用应用自带 CLI 显式指定；0.2.50 起支持 `.cmd`/`.bat`）：
+
+```sh
+# Windows（PowerShell）
+node tools/smoke.mjs --profile desktop --dsh "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd"
+# macOS
+node tools/smoke.mjs --profile desktop --dsh "/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh"
+```
+
 它断言四件实际踩过坑的事：插件确实挂载（`[privmask] 适配检查`）、设置命名空间已注册、
 客户端模块表含 `dsh-privmask/client.js`（界面能看到卡片）、profile 里装的就是仓库这份代码
 （版本一致，可用 `--allow-version-drift` 放宽）。退出码 0/1，可直接进 CI 或发版清单。

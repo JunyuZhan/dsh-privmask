@@ -3,6 +3,22 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.50] - 2026-11-01
+
+### 修复
+
+- **`tools/smoke.mjs` 支持 Windows 的 `dsh.cmd`**：`--dsh <路径>` 在 Windows 上传 `dsh.cmd`
+  会直接抛 `spawn EINVAL`（Node 不能 spawn `.cmd`/`.bat`），导致「在桌面版上验证安装」根本跑不起来。
+  现在检测到 `.cmd`/`.bat` 时改用 `cmd /d /s /c` 调用，并用 `taskkill /T /F` 清理子进程树。
+
+### 文档
+
+- 安装文档补充**实测结论**：DSH Desktop 0.2.1-rc.5 上用自带 CLI 执行
+  `plugin --profile desktop add dsh-privmask` 会自动写入 profile 依赖、把 `dsh-privmask` 加进
+  `dsh.profile.bundles`、并给 pnpm 的 `minimumReleaseAgeExclude` 加白名单；
+  重启后插件挂载、卡片进客户端模块表、profile 版本与 npm 一致（`tools/smoke.mjs` 8/8 通过）。
+- 开发文档的「发版冒烟」补充 Windows/macOS 桌面版自带 CLI 的 `--dsh` 用法。
+
 ## [0.2.49] - 2026-11-01
 
 ### 工程化（按标准开源项目整理）

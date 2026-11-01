@@ -59,6 +59,10 @@ DSH Desktop **自带 CLI 与运行时**（Node 24 + pnpm 11），只是不一定
 注意事项：
 
 - 安装只是把包装进 profile 并登记挂载，**不会读取或上传任何聊天内容**。
+- **已在 DSH Desktop 0.2.1-rc.5 实测**：用自带 CLI 执行
+  `plugin --profile <profile> add dsh-privmask` 会自动写入 profile 依赖、把 `dsh-privmask`
+  加进 `dsh.profile.bundles`、并给 pnpm 的 `minimumReleaseAgeExclude` 加白名单；重启后插件挂载、
+  卡片进入客户端模块表、profile 版本与 npm 一致（`node tools/smoke.mjs` 8/8 通过）。
 - Desktop 正在运行时，CLI 写入 profile 后仍需重启才生效；若提示 profile 被占用，
   改用界面安装（界面会处理锁定、启用与失败回滚）。
 - agent 报告「CLI 找不到」时，也可以让用户直接在界面里装（方式一），不必强求命令行。
