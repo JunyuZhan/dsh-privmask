@@ -1,9 +1,9 @@
 {
- "name": "dsh-privmask",
- "description": "DeepSeek Harness 本地脱敏插件：在 llm/stream 出口拦截发往云端大模型的请求，将密钥、PII、中文实体（姓名/身份证/公司/机关/地址等）替换为占位符后再发送；用户输入与工具结果在写入本地会话日志前同样遮罩，模型回复经入站还原以原值落盘与显示。",
+  "name": "dsh-privmask",
+  "description": "DeepSeek Harness 本地脱敏插件：在请求发往云端大模型前，对密钥、PII 与中文实体做本地遮罩；支持出站脱敏、入站还原、日志与工具结果遮罩，以及 PDF/DOCX/OCR 预检与多版本 DSH 兼容。",
   "version": "0.2.47",
- "author": "JunyuZhan",
- "type": "module",
+  "author": "JunyuZhan",
+  "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
   "engines": {
@@ -26,7 +26,7 @@
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
- "files": [
+  "files": [
     "lib",
     "tools",
     "cordis.patch.yml",
