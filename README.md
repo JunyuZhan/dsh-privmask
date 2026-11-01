@@ -88,13 +88,14 @@ dsh plugin --profile web update dsh-privmask
 dsh plugin --profile web remove dsh-privmask
 ```
 
-> **兼容性**：0.2.43 起按 `npm run dsh:compat` 实测核对过的宿主版本为
-> `@deepseek-ai/dsh` 0.1.0-rc.6 / 0.1.1-rc.2（旧官方线）、0.1.5-rc.2（当前 latest）
-> 与 0.1.6-alpha.2（alpha）；
+> **兼容性**：按 `npm run dsh:compat` 实测核对过的宿主版本为
+> `@deepseek-ai/dsh` 0.1.0-rc.6 / 0.1.1-rc.2（旧官方线）、0.1.5-rc.2 / 0.1.5-rc.3、
+> 0.1.6-alpha.2、0.1.7-rc.2，以及 0.2.1-rc.5（当前 latest）与 0.2.2-alpha.2（alpha）；
 > 核心出站脱敏、落盘遮罩、设置开关在各线上均可用。run_code 子派发日志遮罩仅在宿主提供
-> `tools/ptc-dispatch-log`（dsh ≥ 0.1.2）时自动启用，旧官方版无此事件属宿主能力差异；
-> 客户端模块依赖里 `@deepseek-ai/dsh-client-runtime` 自 0.1.2 起已不存在（后继为
-> `@deepseek-ai/dsh-client-modules`），该条目在新版按未知依赖跳过，卡片仍正常加载。
+> `tools/ptc-dispatch-log`（dsh ≥ 0.1.2）时自动启用——0.2.2-alpha.2 起该水瀑随 PTC 执行器
+> 搬到 `@deepseek-ai/dsh-tool-executor-ptc`，水瀑名与签名不变（插件按事件名软注册，照常生效）；
+> 旧官方版无此事件属宿主能力差异；客户端模块依赖里 `@deepseek-ai/dsh-client-runtime` 自 0.1.2
+> 起已不存在（后继为 `@deepseek-ai/dsh-client-modules`），该条目在新版按未知依赖跳过，卡片仍正常加载。
 
 ### 通过 npm
 
@@ -242,7 +243,8 @@ node tools/redact-text.mjs input.txt out.txt --config cfg.json
 
 ## 版本适配与升级策略
 
-- **已实测核对的宿主版本**：0.1.1-rc.2（旧官方线）、0.1.5-rc.2（当前 latest）与 0.1.6-alpha.2（alpha）。
+- **已实测核对的宿主版本**：0.1.1-rc.2（旧官方线）、0.1.5-rc.2 / 0.1.5-rc.3、0.1.6-alpha.2、
+  0.1.7-rc.2，以及 0.2.1-rc.5（当前 latest）与 0.2.2-alpha.2（alpha）。
 - **设置 API 有三代形态，插件全部软探测**：`settingsScope`（0.1.2–0.1.5）与 `remote.settings`
   （0.1.7+ 又改回来）在客户端二选一；宿主侧 `settings.register`（旧）与 `settings.configure`
   （0.1.7 的 SettingsForms）二选一。两代都没有时卡片仍注册，只在卡片内提示改用配置文件模式。
@@ -255,6 +257,12 @@ node tools/redact-text.mjs input.txt out.txt --config cfg.json
   核对方式是 `npm run dsh:compat`：按版本下载缝所在包到本机 `.dsh-versions/`
   （已 gitignore，只留存不提交），逐个断言缝仍存在并打印「版本 × 缝」矩阵，
   必需缝缺失即退出码 1；同一份缓存也可直接解两个版本做 diff。
+- **0.2.x 复核（0.2.48）**：0.2.1-rc.5（latest/next）与 0.2.2-alpha.2（alpha）上插件押注的缝
+  全部仍在，设置 API 沿用 0.1.7 的 `SettingsForms` + volatile 活引用形态，**插件无需改代码**；
+  客户端侧仍是 `remote.settings`（`settingsScope` 已随 0.1.5 线退场），
+  `sessionController` 的可见性判定与降级声明不变。唯一结构变化是 `tools/ptc-dispatch-log`
+  在 0.2.2-alpha.2 随 PTC 执行器搬到新包 `@deepseek-ai/dsh-tool-executor-ptc`
+  （水瀑名与签名不变，按事件名软注册照常生效），自检脚本已按「两种归属任一命中」处理。
 - **0.1.5-rc.2 / 0.1.6-alpha.2 核对结论**：`llm/stream`、`prepareCall`、`resolveModelInfo`、`agent/pre-step`、
   `tools/post-execute`、`tools/ptc-dispatch-log`、`settings.register`、`attachments.readImage`、
   `x-deepseek-harness-session-id` 全部仍在且签名兼容；`GenerateOptions` 全 12 个字段
@@ -324,7 +332,7 @@ node tools/redact-text.mjs input.txt out.txt --config cfg.json
 
 ```sh
 node test/self-test.js        # 15 项功能回归（端到端拦截 + 中文实体 + 法院保留/检察机关脱敏）
-node test/reliability-test.js # 199 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/base64文本预检/本地OCR兜底/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/settings-forms新形态/volatile活引用/词表热更新/字符串 content 还原/出站脱敏/离境审计/审计摘要CLI/PDF预检CLI/PDF覆写脱敏/dsh0.1.5请求形态/跨平台CRLF与路径/病理输入时间上限）
+node test/reliability-test.js # 201 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/base64文本预检/本地OCR兜底/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩（含 post-execute 宿主默认决策）/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/settings-forms新形态/volatile活引用/词表热更新/字符串 content 还原/出站脱敏/离境审计/审计摘要CLI/PDF预检CLI/PDF覆写脱敏/dsh0.1.5请求形态/跨平台CRLF与路径/病理输入时间上限）
 node test/accuracy-test.js    # 26 项准确性（法律文档矩阵/凭据/PII校验/证件与信用代码上下文/复姓/泛化机构与村镇/姓名标签边界/客户端版本一致性）
 node test/docx-test.js        # docx 本地脱敏（格式保留/非文本条目原样/占位符写入）
 node test/fuzz-test.js        # 300 例随机文本 × 2 断言（不崩 + 幂等，共 600 断言）
@@ -334,14 +342,15 @@ CI（GitHub Actions）在每次 push / PR 时跑三个 job：
 
 - **test**：ubuntu，Node 18/20/22 三档，全量测试；
 - **cross-platform**：macOS + Windows 真机跑同一套测试（Windows 上的 CRLF/路径/venv 布局只有真机跑才算数）；
-- **compat**：`node tools/dsh-compat-check.mjs` 巡检 0.1.1-rc.2 / 0.1.5-rc.2 / 0.1.6-alpha.2 的宿主缝，
+- **compat**：`node tools/dsh-compat-check.mjs` 巡检 0.1.1-rc.2 / 0.1.5-rc.3 / 0.1.7-rc.2 /
+  0.2.1-rc.5 / 0.2.2-alpha.2 的宿主缝，
   上游改事件名/服务名/客户端模块时在这里报警，而不是等用户发现。
 
 宿主适配自检（需要联网，不进 `prepublishOnly`，避免破坏离线发布）：
 
 ```sh
-npm run dsh:compat                 # 核对 0.1.1-rc.2 与 0.1.5-rc.2
-npm run dsh:compat -- 0.1.6-alpha.2   # 核对指定版本（已核对，结论同上）
+npm run dsh:compat                 # 核对 0.1.1-rc.2 与当前 latest/alpha（0.2.1-rc.5 / 0.2.2-alpha.2）
+npm run dsh:compat -- 0.1.7-rc.2   # 核对指定版本（已核对，结论同上）
 npm run dsh:compat -- --upstream   # 只看上游 dist-tags 是否出现未核对的新版本（定时监控用）
 ```
 

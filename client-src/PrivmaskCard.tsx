@@ -72,11 +72,11 @@ const disclaimerBox: React.CSSProperties = {
   background: 'rgba(229, 72, 77, .06)',
 }
 /** 插件适配的 dsh 宿主范围（与 README 一致；功能随宿主能力自动降级） */
-export const DSH_SUPPORT = 'dsh 0.1.0-rc.6+（0.1.1-rc.2 / 0.1.5-rc.2 / 0.1.6-alpha.2 已实测核对）'
+export const DSH_SUPPORT = 'dsh 0.1.0-rc.6+（0.1.1-rc.2 / 0.1.5-rc.2 / 0.1.6-alpha.2 / 0.1.7-rc.2 / 0.2.1-rc.5 / 0.2.2-alpha.2 已核对）'
 /** 免责声明（完整版见 README「责任与边界」） */
 export const DISCLAIMER = '脱敏为启发式本地处理，无法保证零漏检；重要数据请自行评估并保留原文。'
 /** 插件版本（与 package.json 同步；accuracy 测试强制一致，避免发版漂移） */
-export const PLUGIN_VERSION = '0.2.47'
+export const PLUGIN_VERSION = '0.2.48'
 
 export function PrivmaskCard(props: PrivmaskCardInjected) {
   const [enabled, setEnabled] = useState<boolean | null>(null)

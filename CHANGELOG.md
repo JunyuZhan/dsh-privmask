@@ -3,6 +3,45 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.48] - 2026-11-01
+
+### 兼容性（上游 0.2.x 复核，issue #3）
+
+- **0.2.1-rc.5（当前 latest/next）与 0.2.2-alpha.2（alpha）已逐缝核对并纳入已验证清单**：
+  `llm/stream`、`llm.prepareCall`、`llm.resolveModelInfo`、`agent/pre-step`、`tools/post-execute`、
+  `markAgentLoopRequest`、`settings.configure`、`remote.settings`、`attachments.readImage`、
+  `x-deepseek-harness-session-id`、`pluginInventory` 全部仍在且签名兼容，**插件无需为 0.2.x 改代码**；
+  设置 API 沿用 0.1.7 线引入的 `SettingsForms` + volatile 活引用形态（schemastery/cosmokit 的
+  volatile 实现构建字节与 0.1.7 一致，解盒逻辑仍然必要）。
+- **`tools/ptc-dispatch-log` 搬了包**：0.2.2-alpha.2 把 PTC 传输从 `dsh-tools` 抽到新的
+  `@deepseek-ai/dsh-tool-executor-ptc`，水瀑名/字段/返回值语义不变（插件按事件名软注册，
+  run_code 子派发日志遮罩照常生效）。自检脚本把该缝改成「两种归属任一命中」，并把新包加进
+  留存清单，避免下次把它误报成「该版本没有（降级）」。
+- **PTC 模式前提**：0.2.2 删除 `dsh-tools.mode`，PTC 由挂载 `dsh-tool-executor-ptc` 决定；
+  旧 profile 写死 `mode: ptc` 的用户升级后需改挂载方式（否则 `run_code` 不存在，插件 PTC
+  监听器静默不触发）。
+- `DEFAULT_VERSIONS` 改为 0.1.1-rc.2 + 0.2.1-rc.5 + 0.2.2-alpha.2；CI 的 compat job 同步巡检
+  0.1.1-rc.2 / 0.1.5-rc.3 / 0.1.7-rc.2 / 0.2.1-rc.5 / 0.2.2-alpha.2 五个版本，
+  `--upstream` 漂移检查恢复为全绿（三个 dist-tag 都在清单内）。
+- 核对结论与证据写进 `docs/dsh-research.md` §5.5 与 README 版本适配段。
+
+### 修复（与 0.2.x 无关的既有缺陷）
+
+- **`tools/post-execute` 的工具结果落盘遮罩在真实宿主上恒为空操作**（0.1.1→0.2.2 一贯如此）：
+  宿主水瀑的默认决策是 `{ kind: 'accept' }`（不带 `content`），待落盘的规范化内容在第二个实参
+  `result.content` 上；旧代码只读 `decision.content` 且遇 `undefined` 直接返回，等于从不遮罩，
+  与 README「工具结果在写入会话日志前遮罩」不符。现在：决策带 `content` 时以它为准（下游监听器
+  替换过内容的情况），否则退回 `result.content`；`value` 型决策原样放行（宿主不允许 `content`
+  与 `value` 并存）。回归：reliability 新增 T5b（下游替换 content 仍遮罩）与 T5c（value 型决策
+  不追加 content），T5/T6/T13 改按宿主默认决策形态（`{kind:'accept'}` 无 content）断言，199 → 201。
+
+### 其他
+
+- 版本号 0.2.48：`package.json` / `lib/client.js` / `client-src/PrivmaskCard.tsx` 三处同步
+  （accuracy 测试的版本一致性断言覆盖）；卡片「适配宿主」文案补上 0.1.7-rc.2 / 0.2.x。
+- **证据口径**：0.2.x 结论来自编译产物 + 类型声明的源码逐缝核对（本机无 0.2.x 真机宿主），
+  与 0.1.7-rc.2 的真机验证分开表述。
+
 ## [0.2.47] - 2026-09-24
 
 ### 兼容性（上游 0.1.7 换了设置 API）

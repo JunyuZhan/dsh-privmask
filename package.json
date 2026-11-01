@@ -1,7 +1,7 @@
 {
   "name": "dsh-privmask",
   "description": "DeepSeek Harness 本地脱敏插件：在请求发往云端大模型前，对密钥、PII 与中文实体做本地遮罩；支持出站脱敏、入站还原、日志与工具结果遮罩，以及 PDF/DOCX/OCR 预检与多版本 DSH 兼容。",
-  "version": "0.2.47",
+  "version": "0.2.48",
   "author": "JunyuZhan",
   "type": "module",
   "main": "lib/index.js",

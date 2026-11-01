@@ -19,8 +19,8 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CACHE_DIR = join(ROOT, '.dsh-versions');
 
-/** 默认核对：旧官方线（客户端 inject 声明的 runtime 只在这条线上存在）+ 当前 latest。 */
-const DEFAULT_VERSIONS = ['0.1.1-rc.2', '0.1.5-rc.2'];
+/** 默认核对：旧官方线（客户端 inject 声明的 runtime 只在这条线上存在）+ 当前 latest / alpha。 */
+const DEFAULT_VERSIONS = ['0.1.1-rc.2', '0.2.1-rc.5', '0.2.2-alpha.2'];
 
 /** 需要留存的包：每个缝的归属包，以及浏览器端模块表相关包。 */
 const PACKAGES = [
@@ -29,6 +29,7 @@ const PACKAGES = [
   '@deepseek-ai/dsh-agent',
   '@deepseek-ai/dsh-agent-loop',
   '@deepseek-ai/dsh-tools',
+  '@deepseek-ai/dsh-tool-executor-ptc',
   '@deepseek-ai/dsh-settings',
   '@deepseek-ai/dsh-llm-deepseek',
   '@deepseek-ai/dsh-attachment-local',
@@ -51,7 +52,17 @@ const SEAMS = [
   { id: 'tools/post-execute', pkg: '@deepseek-ai/dsh-tools', needle: 'tools/post-execute', required: true, note: '工具结果落盘前遮罩' },
   { id: 'agent-loop 请求标记', pkg: '@deepseek-ai/dsh-agent-loop', needle: 'markAgentLoopRequest', required: true, note: '脱敏副本重入水瀑的放行前提' },
   { id: 'llm.resolveModelInfo', pkg: '@deepseek-ai/dsh-llm', needle: 'resolveModelInfo', required: false, note: 'localOcr 的图片模态改写' },
-  { id: 'tools/ptc-dispatch-log', pkg: '@deepseek-ai/dsh-tools', needle: 'tools/ptc-dispatch-log', required: false, note: 'run_code 子派发日志遮罩（≥0.1.2）' },
+  // 0.1.2 起在 dsh-tools；0.2.2-alpha.2 把 PTC 子派发搬进新包 dsh-tool-executor-ptc
+  // （水瀑名与签名不变，插件仍按事件名软注册，因此两种归属都算命中）
+  {
+    id: 'tools/ptc-dispatch-log',
+    required: false,
+    note: 'run_code 子派发日志遮罩（≥0.1.2；0.2.2-alpha.2 起随 PTC 执行器搬到 dsh-tool-executor-ptc）',
+    any: [
+      { pkg: '@deepseek-ai/dsh-tools', needle: 'tools/ptc-dispatch-log' },
+      { pkg: '@deepseek-ai/dsh-tool-executor-ptc', needle: 'tools/ptc-dispatch-log' },
+    ],
+  },
   // 设置 API 是「卡片开关 live 生效」的命脉，且上游改过两次（0.1.2 前的 remote.settings →
   // settingsScope → 0.1.7 又改回 remote.settings + host 的 SettingsForms）。任一形态都在即可，
   // 但全都找不到就说明这条链路断了，必须报红：critical
@@ -141,7 +152,10 @@ async function ensurePackage(name, version, versionDir) {
 }
 
 /** 我们已经逐缝核对过、并写进 README 的宿主版本；`--upstream` 用它判断「上游是否出现未核对版本」。 */
-const VERIFIED_VERSIONS = ['0.1.1-rc.2', '0.1.5-rc.2', '0.1.5-rc.3', '0.1.6-alpha.2', '0.1.7-alpha.2', '0.1.7-rc.2'];
+const VERIFIED_VERSIONS = [
+  '0.1.1-rc.2', '0.1.5-rc.2', '0.1.5-rc.3', '0.1.6-alpha.2', '0.1.7-alpha.2', '0.1.7-rc.2',
+  '0.2.1-rc.5', '0.2.2-alpha.2',
+];
 
 const upstreamOnly = process.argv.includes('--upstream');
 const alsoCheck = process.argv.includes('--check');

@@ -207,6 +207,36 @@ if (schema.type === 'object') { /* 递归收集 volatile 子字段 */ }
 profile 的 `cordis.patch.yml` 出现 `redactNames: false` 等落盘值；dsh 0.1.5-rc.2 上仍走
 `register` + `settingsScope` 老路径，冒烟 8/8 通过。
 
+### 5.5 0.2.1-rc.5 / 0.2.2-alpha.2 复核（2026-11-01，issue #3）
+
+上游把 latest/next 推到 `0.2.1-rc.5`、alpha 推到 `0.2.2-alpha.2`，`--upstream` 漂移检查连续报警。
+用 `npm run dsh:compat 0.2.1-rc.5 0.2.2-alpha.2` 逐缝核对，结论：**宿主侧与卡片侧都不需要改代码**。
+
+| 缝 | 0.2.x 证据与结论 |
+|---|---|
+| `llm/stream` / `prepareCall` / `resolveModelInfo` | `dsh-llm/lib/index.js` 水瀑仍在；`GenerateOptions` 全 12 个字段逐一相同 |
+| `agent/pre-step` | `dsh-agent/lib/types/runtime-types.d.ts` 决策仍为 enter/reject，仅新增 `modelSelection` |
+| `tools/post-execute` | 水瀑签名三版一致；但**插件侧取数方式**有既有缺陷（见下） |
+| 设置 API | `settings.configure({auto})` + `SettingsForms` 不变；schemastery 3.18.4/3.18.5/3.18.6-alpha.1 与 cosmokit 的 volatile 实现构建字节相同，活引用盒仍 `{get(),[write]}`，`resolveConfig()` 解盒仍必要 |
+| 客户端 | `remote.settings.describe()/update()`、`settings.plugins.tab` 槽、`slots`/`locale` 注册 API 不变；`settingsScope` 自 0.1.7 起即不存在（软探测回调不触发，`remote.settings` 分支命中）；模块表对未知 inject 条目继续静默跳过（`dsh-client-runtime` 404 无害） |
+| `sessionController` | 注册包（`dsh-api-session-controller`）/服务名/挂载行/方法签名不变；0.2.2 的 `page()` 返回 `SessionEventsPage`（仍含 `records`），插件守卫可容忍 |
+| `tools/ptc-dispatch-log` | **搬家而非移除**：0.2.2-alpha.2 把 PTC 传输从 `dsh-tools` 抽到新包 `dsh-tool-executor-ptc`，水瀑名/`PtcDispatchLog` 字段/返回值语义全同；插件按事件名软注册照常生效，`tool/ptc-dispatch` 落盘仍取遮罩后内容。自检脚本已改为「两种归属任一命中」 |
+| 其他 | `attachments.readImage`、`x-deepseek-harness-session-id`、`pluginInventory` 均不变 |
+
+两个附带结论（0.2.48 已处理）：
+
+1. **`tools/post-execute` 的落盘遮罩此前在真实宿主上是空操作**（0.1.1→0.2.2 一贯如此，**不是**
+   0.2.x 回归）：宿主水瀑的默认决策是 `() => ({ kind: 'accept' })`（不带 `content`），待落盘的
+   规范化内容在第二个实参 `result.content` 上，插件只看 `decision.content` 时会直接 return。
+   现改为「决策带 content 就用它，否则退回 `result.content`；`value` 型决策原样放行」，
+   回归见 reliability T5/T5b/T5c。
+2. **PTC 模式前提变了**：0.2.2 删掉 `dsh-tools.mode`，PTC 由挂载 `dsh-tool-executor-ptc` 决定；
+   旧 profile 写死 `mode: ptc` 的用户升级后需改挂载方式，否则 `run_code` 不存在、插件 PTC
+   监听器不会触发（静默降级，不报错）。
+
+**证据口径**：以上为编译产物 + 类型声明的源码逐缝核对——本机没有 0.2.x 真机宿主，故未做真机验证；
+0.1.7-rc.2 的真机结论仍以 §5.4 为准。0.2.x 声明建议按 README 的冒烟清单各跑一次 `npm run smoke`。
+
 ## 6. 后续改进方向（按优先级）
 
 1. **展示还原**：推动 dsh 官方提供外层可见的会话读取/改写缝或映射 RPC；

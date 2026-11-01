@@ -572,7 +572,12 @@ function logMaskHarness(config) {
       return preStep({ agent: { session: { id: sessionId } }, messages: [] }, async () => ({ kind: 'enter', messages }));
     },
     async postExecute(sessionId, name, content) {
-      return postExec({ name, agent: { session: { id: sessionId } } }, {}, async () => ({ kind: 'accept', content }));
+      // 与真实宿主一致：水瀑的默认决策是 { kind: 'accept' }（不带 content），
+      // 待落盘的规范化内容在第二个实参 result.content 上。
+      return postExec({ name, agent: { session: { id: sessionId } } }, { isError: false, value: null, content }, async () => ({ kind: 'accept' }));
+    },
+    async postExecuteDecision(sessionId, name, content, decision) {
+      return postExec({ name, agent: { session: { id: sessionId } } }, { isError: false, value: null, content }, async () => decision);
     },
     async ptcDispatch(sessionId, name, content) {
       return ptcLog({ name, agent: { session: { id: sessionId } }, exec: { agent: { session: { id: sessionId } } }, content }, async () => content);
@@ -601,6 +606,13 @@ const td4 = await LTblock.preStep('sess-T', [{ role: 'user', content: [{ type: '
 t('T4 block-拒绝步骤', td4.kind === 'reject', JSON.stringify(td4));
 const td5 = await LT.postExecute('sess-T', 'write_file', [{ type: 'text', text: '写入 ' + S.email }]);
 t('T5 工具结果落盘遮罩', td5.kind === 'accept' && td5.content[0].text.includes('[REDACTED_EMAIL_') && !td5.content[0].text.includes(S.email), JSON.stringify(td5.content));
+// 宿主默认决策不带 content（`() => ({ kind: 'accept' })`）时，必须以第二个实参 result.content 为底，
+// 否则钩子恒为空操作、工具结果明文落盘（0.1.1→0.2.2 的宿主契约，回归 T5b/T5c）
+const td5b = await LT.postExecuteDecision('sess-T', 'read_file', [{ type: 'text', text: '原文 ' + S.email }], { kind: 'accept', content: [{ type: 'text', text: '下游改写 ' + S.phone }] });
+t('T5b 下游替换过 content 时以决策为准', td5b.kind === 'accept' && td5b.content[0].text.includes('[REDACTED_PHONE_') && !td5b.content[0].text.includes(S.phone), JSON.stringify(td5b.content));
+const vDecisionT = { kind: 'accept', value: { ok: 1 } };
+const td5c = await LT.postExecuteDecision('sess-T', 'read_file', [{ type: 'text', text: '原文 ' + S.email }], vDecisionT);
+t('T5c value 型决策不追加 content（否则宿主抛 TypeError）', td5c === vDecisionT && td5c.content === undefined);
 const LTstrip2 = logMaskHarness({ logRedactions: false });
 const td6 = await LTstrip2.postExecute('sess-T', 'lookup', [{ type: 'text', text: '结果' }, { type: 'image', image: 'aGVsbG8=' }]);
 t('T6 工具结果 strip-图片移除', td6.content.length === 1 && td6.content[0].type === 'text', JSON.stringify(td6.content));
