@@ -16,6 +16,7 @@
   并新增 `docs/dev/README.md` 明确「开发记录，非用户文档」。
 - **移除未引用模块**：删除从未被任何代码引用的 `lib/vault.js`（加密映射存储雏形；需要时从
   commit `3b9dd9b` 取回）。
+- **编辑器规范**：新增 `.editorconfig`（UTF-8/LF/2 空格；构建产物 `lib/client.js` 为 tab）。
 
 ## [0.2.48] - 2026-11-01
 
