@@ -6,7 +6,7 @@
 涉案金额保留（公开可查或办案所需）。
 
 ```yaml
-# $DSH_HOME/profiles/web/cordis.patch.yml 中按 id 覆盖
+# $DSH_HOME/profiles/<profile>/cordis.patch.yml 中按 id 覆盖（桌面版是 desktop）
 - id: privmask
   config:
     enabled: true

@@ -25,12 +25,23 @@ DeepSeek Harness 本地脱敏插件：请求发往云端大模型之前，把密
 
 ## 安装
 
+**DSH Desktop（推荐，绝大多数用户）**：打开侧栏「插件」→「添加插件」→ 输入 `dsh-privmask`
+→「安装」→「立即启用」，然后按提示重启 DSH Desktop；「设置 → 插件」里会出现「隐私保护」页签。
+
+**让 agent 帮你装**：把下面这句发给你的 agent（DSH 内置 agent，或任何能执行命令的编码 agent）：
+
+> 帮我安装 DeepSeek Harness 脱敏插件 `dsh-privmask` 并验证：「设置 → 插件」出现「隐私保护」页签、
+> 卡片显示版本号；按 https://github.com/JunyuZhan/dsh-privmask/blob/main/docs/install.md#方式二让-agent-自行安装
+> 的步骤做，装完告诉我版本和是否需要重启。
+
+**命令行（web profile / 无界面部署）**：
+
 ```sh
-dsh plugin --profile web add dsh-privmask      # DSH Desktop 换成 --profile desktop
+dsh plugin --profile web add dsh-privmask
 ```
 
-装完重启宿主生效。headless / 无客户端界面的 profile 用配置文件模式接入，
-镜像源、pnpm 最小发布期、更新后必须重启等排查项见[安装与升级](https://github.com/JunyuZhan/dsh-privmask/blob/main/docs/install.md)。
+装完重启宿主生效；镜像源、pnpm 最小发布期、Desktop 自带 CLI、无界面 profile 的配置文件模式
+等排查项见[安装与升级](https://github.com/JunyuZhan/dsh-privmask/blob/main/docs/install.md)。
 
 ## 快速开始
 
@@ -38,7 +49,7 @@ dsh plugin --profile web add dsh-privmask      # DSH Desktop 换成 --profile de
 按需在 profile 的 `cordis.patch.yml` 里覆盖，或在客户端卡片上直接改（live 生效）：
 
 ```yaml
-# $DSH_HOME/profiles/web/cordis.patch.yml
+# $DSH_HOME/profiles/<profile>/cordis.patch.yml
 - id: privmask
   config:
     enabled: true

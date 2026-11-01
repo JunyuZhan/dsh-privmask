@@ -23,6 +23,9 @@
 - **README 收敛为门面**（440 → ~130 行）：只保留一句话简介、特性、安装、快速开始与文档导航；
   安装排查、完整配置表、脱敏机制、安全模型、兼容性矩阵、CLI 工具、诊断、已知限制、开发与发布
   分别拆到 `docs/` 下的独立页面，由 [docs/README.md](docs/README.md) 统一索引。
+- **安装章节按实际用户分层**：DSH Desktop 界面安装（推荐，绝大多数用户）→ 让 agent 自行安装
+  （含可直接复制的提示词、Desktop 自带 CLI 路径与校验清单）→ CLI（web/headless）→ npm → 配置文件模式；
+  说明 Desktop 自带 Node 24 + pnpm 11 与内置 CLI，用户无需另装工具链。
 - 同步更新代码与工作流里的指引路径：`tools/dsh-compat-check.mjs`、`tools/redact-docx.mjs`、
   `.github/workflows/watch-upstream.yml`（自动 issue 的处理步骤）、CONTRIBUTING 与开发记录。
 
