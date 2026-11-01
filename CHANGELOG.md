@@ -3,6 +3,16 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### 文档
+
+- **安装新增「插件市场」入口**：DSH Desktop 的插件页启用「自定义插件市场」后，可在「发现」里搜索
+  `dsh-privmask` 一键安装；文档写清了索引源（DSH.SO `https://cdn.dsh.so/market/index.json`）、
+  收录状态与搜不到时的回退（界面按包名安装 / 让 agent 安装）。
+- 仓库已加 `dsh-plugin` topic，进入 DSH.SO 注册表的自动发现队列；其 submit API 当前受上游
+  GitHub 限流（429），提交任务稍后重试，不影响 topic 自动发现。收录与生效时间由第三方控制。
+
 ## [0.2.50] - 2026-11-01
 
 ### 修复

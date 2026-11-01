@@ -8,7 +8,20 @@
 
 两种方式装的都是同一个 npm 包 `dsh-privmask`，区别只在装进哪个 profile。
 
-## 方式一：DSH Desktop 界面（推荐）
+## 方式一：插件市场「发现」（最省事）
+
+DSH Desktop 的插件页支持插件市场索引（实验性组合包「自定义插件市场」）。本插件仓库已加 `dsh-plugin` topic，进入 [DSH.SO 插件注册表](https://www.dsh.so/)
+的自动发现队列（收录审核与索引刷新由第三方控制，审核期间在「发现」里搜不到属正常）。
+
+1. 侧栏**插件** → 实验性插件旁的**更多** → 启用**自定义插件市场**（插件页随后出现**发现**标签）；
+2. 切到**发现**；若还没有索引源，点**添加索引源**填 `https://cdn.dsh.so/market/index.json`
+   （DSH.SO 社区市场，多数桌面版已预置）；
+3. 搜索 `dsh-privmask` → **安装** → 确认 → **立即启用** → 重启 DSH Desktop。
+
+该索引由第三方维护，收录与刷新时间不受我们控制；搜不到或急着用时，直接走
+**方式二**（界面「添加插件」按包名装）或**方式三**（让 agent 装）。
+
+## 方式二：DSH Desktop「添加插件」
 
 1. 侧栏打开**插件** → **已安装**标签 → **添加插件**；
 2. 输入包名 `dsh-privmask`（可带版本，如 `dsh-privmask@0.2.49`）；
@@ -25,7 +38,7 @@
   安装期脚本，正常不会遇到；遇到时按提示允许即可。
 - 内网镜像源还没同步新版本时，在安装源的选项里切到 npm 官方源再装。
 
-## 方式二：让 agent 自行安装
+## 方式三：让 agent 自行安装
 
 适用：DSH 内置 agent（自带终端工具），或任何能执行命令的编码 agent。
 
@@ -74,7 +87,7 @@ agent 装完后的检查清单（也可以让用户自己看）：
 - [ ] 重启后「设置 → 插件」有「隐私保护」页签，卡片显示版本号
 - [ ] 发一条含邮箱的消息，会话日志里 `user/message` 为 `[REDACTED_EMAIL_N]`（出站遮罩生效）
 
-## 方式三：CLI（web profile / 无界面部署）
+## 方式四：CLI（web profile / 无界面部署）
 
 ```sh
 dsh plugin --profile web add dsh-privmask
@@ -89,13 +102,13 @@ dsh plugin --profile web remove dsh-privmask
 
 只装到 web profile 时，桌面版的 `desktop` profile 不受影响；反之亦然。
 
-## 方式四：npm（手动）
+## 方式五：npm（手动）
 
 ```sh
 npm install dsh-privmask
 ```
 
-只安装包不会自动挂进任何 profile；还需要按方式一/三/配置文件模式接入。
+只安装包不会自动挂进任何 profile；还需要按方式二/四/配置文件模式接入。
 
 ## 配置文件模式（无客户端界面的 profile）
 
