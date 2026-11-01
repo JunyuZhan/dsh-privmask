@@ -2,3 +2,9 @@ node_modules/
 .dsh-versions/
 :memory:.ses
 .DS_Store
+
+# 本地调试/打包产物
+npm-debug.log*
+*.tgz
+.env
+.env.*

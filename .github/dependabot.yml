@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # 运行时依赖（@deepseek-ai/schemastery）与构建工具（esbuild）
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+  # CI 里引用的 actions（checkout / setup-node）
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

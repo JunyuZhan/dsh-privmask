@@ -1,6 +1,6 @@
 {
   "name": "dsh-privmask",
-  "description": "DeepSeek Harness 本地脱敏插件：在请求发往云端大模型前，对密钥、PII 与中文实体做本地遮罩；支持出站脱敏、入站还原、日志与工具结果遮罩，以及 PDF/DOCX/OCR 预检与多版本 DSH 兼容。",
+  "description": "DeepSeek Harness 本地脱敏插件：请求上云前遮罩密钥、PII 与中文实体，用户输入与工具结果落盘前同样遮罩，支持入站还原与多版本 DSH 兼容。",
   "version": "0.2.48",
   "author": "JunyuZhan",
   "type": "module",
@@ -68,9 +68,15 @@
     "llm"
   ],
   "scripts": {
-    "prepublishOnly": "node test/self-test.js && node test/accuracy-test.js && node test/reliability-test.js && node test/fuzz-test.js && node test/docx-test.js",
+    "build": "node tools/build-client.mjs",
+    "build:check": "node tools/build-client.mjs --check",
+    "test": "node test/self-test.js && node test/accuracy-test.js && node test/reliability-test.js && node test/fuzz-test.js && node test/docx-test.js",
+    "prepublishOnly": "npm run build:check && npm test",
     "mask:preview": "node tools/mask-preview.mjs",
     "dsh:compat": "node tools/dsh-compat-check.mjs",
     "smoke": "node tools/smoke.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
   }
 }

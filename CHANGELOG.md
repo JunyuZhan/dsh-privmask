@@ -3,6 +3,20 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### 工程化（按标准开源项目整理）
+
+- **客户端产物可重建**：新增 `tools/build-client.mjs`（esbuild 打包 + 宿主模块加载器包裹）与
+  `npm run build` / `npm run build:check`，`lib/client.js` 由 `client-src/*.ts` 生成、不再手工维护；
+  CI 与 `prepublishOnly` 会校验产物与源码一致，避免「源码是摆设、产物靠手改」。
+- **依赖与测试入口标准化**：`esbuild` 进 `devDependencies`，新增 `package-lock.json`（CI 改用
+  `npm ci`）、`npm test`（五套测试一条命令）、`.github/dependabot.yml`（npm 与 GitHub Actions 周检）。
+- **开发记录归位**：`docs/dsh-research.md` 移到 [docs/dev/dsh-research.md](docs/dev/dsh-research.md)，
+  并新增 `docs/dev/README.md` 明确「开发记录，非用户文档」。
+- **移除未引用模块**：删除从未被任何代码引用的 `lib/vault.js`（加密映射存储雏形；需要时从
+  commit `3b9dd9b` 取回）。
+
 ## [0.2.48] - 2026-11-01
 
 ### 兼容性（上游 0.2.x 复核，issue #3）
@@ -23,7 +37,7 @@
 - `DEFAULT_VERSIONS` 改为 0.1.1-rc.2 + 0.2.1-rc.5 + 0.2.2-alpha.2；CI 的 compat job 同步巡检
   0.1.1-rc.2 / 0.1.5-rc.3 / 0.1.7-rc.2 / 0.2.1-rc.5 / 0.2.2-alpha.2 五个版本，
   `--upstream` 漂移检查恢复为全绿（三个 dist-tag 都在清单内）。
-- 核对结论与证据写进 `docs/dsh-research.md` §5.5 与 README 版本适配段。
+- 核对结论与证据写进 `docs/dev/dsh-research.md` §5.5 与 README 版本适配段。
 
 ### 修复（与 0.2.x 无关的既有缺陷）
 
@@ -72,7 +86,7 @@
 - 新增 `.github/workflows/watch-upstream.yml`：每天 09:00（北京时间）自动巡检，
   有漂移或关键缝缺失时 CI 报红并自动开/更新 issue。
 - 已核对并把 `0.1.5-rc.3` / `0.1.7-alpha.2` / `0.1.7-rc.2` 纳入已验证清单；
-  README 版本适配段与 `docs/dsh-research.md` §5.3 记录了三代设置 API 的形态与策略。
+  README 版本适配段与 `docs/dev/dsh-research.md` §5.3 记录了三代设置 API 的形态与策略。
 - **真机验证**：dsh `0.1.7-rc.2` 上卡片显示真实值（总开关/全面脱敏/机关开关），点击开关后
   profile 的 `cordis.patch.yml` 落盘 `redactNames: false` 等值，宿主启动无「entry did not activate」
   告警；dsh `0.1.5-rc.2` 上仍走 `register` + `settingsScope` 老路径，冒烟 8/8 通过。
@@ -178,7 +192,7 @@
   `agent/pre-step`、`tools/post-execute`、`tools/ptc-dispatch-log`、`settings.register`、
   `attachments.readImage`、客户端模块等缝仍存在，打印「版本 × 缝」矩阵，
   必需缝缺失即退出码 1。脚本需要联网，**不进** `prepublishOnly`，发布流程保持离线可跑。
-- 实测核对 0.1.5-rc.2 与 0.1.6-alpha.2：上述缝全部仍在且签名兼容（详见 `docs/dsh-research.md` §5.1）；
+- 实测核对 0.1.5-rc.2 与 0.1.6-alpha.2：上述缝全部仍在且签名兼容（详见 `docs/dev/dsh-research.md` §5.1）；
   把 `GenerateOptions` 全 12 个字段（`reasoningEffort` / `temperature` / `maxTokens` / `stop` /
   `purpose` 等，0.1.1 起即存在、此前只在白名单外走兜底）固化为必测口径：字段原样保留、
   不触发 failClosed，其中 `stop` 内的敏感值与消息共用同一占位符
@@ -191,7 +205,7 @@
 
 ### 文档
 
-- README「版本适配与升级策略」重写为实测口径；`docs/dsh-research.md` 新增 0.1.5-rc.2
+- README「版本适配与升级策略」重写为实测口径；`docs/dev/dsh-research.md` 新增 0.1.5-rc.2
   复核一节（逐缝证据、`file`/`image` 投影发生在水瀑之后、展示层还原仍不可达、
   `agent/inbox/spliced` 限制仍在）；CONTRIBUTING 增加 dsh 适配约定。
 

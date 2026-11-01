@@ -13,12 +13,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
-      - run: npm install --no-save @deepseek-ai/schemastery@^3.18.1 @deepseek-ai/cordis@^4.0.1
-      - run: node test/self-test.js
-      - run: node test/accuracy-test.js
-      - run: node test/reliability-test.js
-      - run: node test/fuzz-test.js
-      - run: node test/docx-test.js
+      - run: npm ci
+      # 客户端产物必须能从 client-src 重建（否则公开仓库里的源码是摆设）
+      - run: npm run build:check
+      - run: npm test
 
   # 真机跨平台矩阵：Windows 的 CRLF/路径/venv 布局、macOS 的路径与换行都只有真机跑才算数
   cross-platform:
@@ -32,12 +30,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm install --no-save @deepseek-ai/schemastery@^3.18.1 @deepseek-ai/cordis@^4.0.1
-      - run: node test/self-test.js
-      - run: node test/accuracy-test.js
-      - run: node test/reliability-test.js
-      - run: node test/fuzz-test.js
-      - run: node test/docx-test.js
+      - run: npm ci
+      - run: npm run build:check
+      - run: npm test
 
   # 宿主缝巡检：上游改事件名/服务名/客户端模块时在这里报警，而不是等用户发现
   compat:

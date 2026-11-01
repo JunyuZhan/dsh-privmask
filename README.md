@@ -275,7 +275,7 @@ node tools/redact-text.mjs input.txt out.txt --config cfg.json
 - manifest 依赖行只保留各版本模块表都存在的公共模块，并有自动化回归防止误加回版本专属依赖；
   `dsh.client.inject` 里已不存在的条目由 `npm run dsh:compat` 显式列出（宿主按未知条目跳过）。
 - **dsh 升级建议**：升级宿主前先跑 `npm run dsh:compat <新版本>` 看缝是否还齐，
-  再跑仓库四套测试；若 dsh 客户端模块表/事件名发生变化，优先检查卡片是否正常出现、
+  再跑仓库测试（`npm test`）；若 dsh 客户端模块表/事件名发生变化，优先检查卡片是否正常出现、
   控制台是否有 `展示层还原未安装` 类告警，再按告警决定是否等新版本插件。
 
 ## 跨平台支持
@@ -330,6 +330,16 @@ node tools/redact-text.mjs input.txt out.txt --config cfg.json
 
 ## 测试与 CI
 
+开发环境（Node ≥ 18）：
+
+```sh
+npm install        # 运行时依赖 + peer + 构建/测试工具
+npm run build      # client-src → lib/client.js（产物由源码生成，不要手改）
+npm test           # 五套测试：self / accuracy / reliability / fuzz / docx
+```
+
+单套运行（定位问题用）：
+
 ```sh
 node test/self-test.js        # 15 项功能回归（端到端拦截 + 中文实体 + 法院保留/检察机关脱敏）
 node test/reliability-test.js # 201 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/base64文本预检/本地OCR兜底/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩（含 post-execute 宿主默认决策）/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/settings-forms新形态/volatile活引用/词表热更新/字符串 content 还原/出站脱敏/离境审计/审计摘要CLI/PDF预检CLI/PDF覆写脱敏/dsh0.1.5请求形态/跨平台CRLF与路径/病理输入时间上限）
@@ -340,7 +350,7 @@ node test/fuzz-test.js        # 300 例随机文本 × 2 断言（不崩 + 幂�
 
 CI（GitHub Actions）在每次 push / PR 时跑三个 job：
 
-- **test**：ubuntu，Node 18/20/22 三档，全量测试；
+- **test**：ubuntu，Node 18/20/22 三档，`npm ci` → `npm run build:check`（产物与源码一致）→ `npm test`；
 - **cross-platform**：macOS + Windows 真机跑同一套测试（Windows 上的 CRLF/路径/venv 布局只有真机跑才算数）；
 - **compat**：`node tools/dsh-compat-check.mjs` 巡检 0.1.1-rc.2 / 0.1.5-rc.3 / 0.1.7-rc.2 /
   0.2.1-rc.5 / 0.2.2-alpha.2 的宿主缝，
@@ -404,7 +414,8 @@ npm run mask:preview -- 案情.txt --redactFacts   # 全面档：姓名/公司/�
 - 开发/提交流程见 [CONTRIBUTING.md](CONTRIBUTING.md)
 - 发现漏检/误伤或功能建议：提交 [Issue](https://github.com/JunyuZhan/dsh-privmask/issues)（附测试样例，便于回归）
 - 改进规则或修复 bug：提交 [PR](https://github.com/JunyuZhan/dsh-privmask/pulls)
-- 提交前请确保四套测试全部通过（`self/accuracy/reliability/fuzz`）
+- 提交前请确保五套测试全部通过（`npm test`），改动 `client-src/` 时跑过 `npm run build:check`
+- 机制研究与上游版本适配复核记录在 [docs/dev/](docs/dev/README.md)（**开发记录，非用户文档**）
 
 ## 安全
 

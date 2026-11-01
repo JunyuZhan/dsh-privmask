@@ -48,10 +48,10 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: 依赖（宿主 peer）
+      - name: 依赖（含构建与测试所需）
         if: steps.check.outputs.exists == 'false'
-        run: npm install --no-save @deepseek-ai/schemastery@^3.18.1 @deepseek-ai/cordis@^4.0.1
+        run: npm ci
 
-      - name: 发布（prepublishOnly 会自动跑五套测试）
+      - name: 发布（prepublishOnly 会先校验产物并跑五套测试）
         if: steps.check.outputs.exists == 'false'
         run: npm publish --provenance --access public

@@ -5,24 +5,36 @@
 ## 开发环境
 
 - Node.js >= 18
-- 依赖：`@deepseek-ai/schemastery`、`@deepseek-ai/cordis`（测试可直接 `npm install --no-save`）
+- 依赖全部声明在 `package.json`（运行时 `@deepseek-ai/schemastery`、peer `@deepseek-ai/cordis`、构建用 `esbuild`），一条命令装好：
 
 ```sh
-npm install --no-save @deepseek-ai/schemastery@^3.18.1 @deepseek-ai/cordis@^4.0.1
+npm install
+```
+
+- 浏览器端产物 `lib/client.js` **由源码生成，不要手改**：
+
+```sh
+npm run build        # client-src/index.ts → lib/client.js（esbuild 打包进宿主模块加载器）
+npm run build:check  # 只校验产物与源码一致（CI 与发布前都会跑）
 ```
 
 ## 运行测试
 
-提交前必须跑通全部四套：
+提交前必须跑通全部五套（CI 与 `prepublishOnly` 用的是同一条命令）：
+
+```sh
+npm test
+```
+
+需要单套定位时：
 
 ```sh
 node test/self-test.js        # 端到端拦截 + 中文实体
 node test/accuracy-test.js    # 准确性：法律文书矩阵/证件上下文/复姓/误伤/客户端版本一致性
 node test/reliability-test.js # 可靠性：边界/幂等/还原/流式/配置/严格模式
 node test/fuzz-test.js        # 随机文本：不崩 + 幂等
+node test/docx-test.js        # docx 本地脱敏
 ```
-
-`npm publish` 的 `prepublishOnly` 会自动执行以上全部测试。
 
 ## 代码结构
 
@@ -30,9 +42,12 @@ node test/fuzz-test.js        # 随机文本：不崩 + 幂等
 - `lib/engine.js` — 会话映射、占位符编号、脱敏管线
 - `lib/restore.js` — 占位符→原值还原（含流式重组）
 - `lib/index.js` — 插件入口（llm/stream 拦截、pre-step/工具落盘遮罩、展示层还原、settings）
-- `lib/client.js` — 浏览器端隐私保护卡片
-- `test/*.js` — 四套测试
+- `client-src/` — 浏览器端源码（`index.ts` 注册卡片、`PrivmaskCard.tsx` 卡片组件）
+- `lib/client.js` — 浏览器端产物，由 `npm run build` 生成
+- `tools/build-client.mjs` — 客户端产物构建与一致性校验
+- `test/*.js` — 五套测试
 - `tools/mask-preview.mjs` — 脱敏对照 CLI
+- `docs/dev/` — 开发记录（机制研究/版本适配复核），**不是用户文档**
 
 ## 规则改动约定
 
@@ -42,14 +57,15 @@ node test/fuzz-test.js        # 随机文本：不崩 + 幂等
 3. **幂等**：任何规则都必须保证「脱敏结果再次脱敏不变」——reliability/fuzz 会检查。
 4. **还原对称**：新增占位符类别时确认 `restore.js` 无需改动（类别无关），并在还原测试中覆盖。
 5. **版本同步**：改动 `package.json` 版本时，同步更新：
-   - `lib/client.js` 的 `PLUGIN_VERSION`（有测试强制一致）
+   - `client-src/PrivmaskCard.tsx` 的 `PLUGIN_VERSION`（accuracy 测试强制与 `package.json` 一致）
+   - 跑一次 `npm run build` 重新生成 `lib/client.js`（产物里的版本号随源码走）
    - `CHANGELOG.md`（Keep a Changelog 格式）
    - `README.md` 的测试计数（如涉及）
 
 ## dsh 适配约定
 
 - 宿主缝（事件名、服务名、客户端模块 id）变更时：先跑 `npm run dsh:compat <新版本>`
-  看缝是否还齐，再改代码；核对结论写进 `docs/dsh-research.md` 与 README 的版本适配段。
+  看缝是否还齐，再改代码；核对结论写进 `docs/dev/dsh-research.md` 与 README 的版本适配段。
 - `.dsh-versions/` 是各版本源码的本机留存目录（gitignore），不提交、不进包；
   新增依赖的宿主包时把它加进 `tools/dsh-compat-check.mjs` 的 `PACKAGES` 列表。
 - 该脚本需要联网，**不要**挂进 `prepublishOnly`（发布必须能离线跑通）。
@@ -67,8 +83,9 @@ chore: 发布准备
 
 ## 发布流程（维护者）
 
-1. 改 `package.json` 版本（同步 `lib/client.js` / `client-src` 的 `PLUGIN_VERSION`、CHANGELOG）
-2. 本地验证：`node tools/smoke.mjs`（真实起一次 `dsh web`，断言插件挂载 + 卡片进模块表 + profile 装的就是这份代码；
+1. 改 `package.json` 版本（同步 `client-src/PrivmaskCard.tsx` 的 `PLUGIN_VERSION`、跑 `npm run build`、更新 CHANGELOG）
+2. 本地验证：`npm ci && npm test && npm run build:check`，再跑 `node tools/smoke.mjs`
+   （真实起一次 `dsh web`，断言插件挂载 + 卡片进模块表 + profile 装的就是这份代码；
    需要本机已装 dsh 且 profile 里有本插件）+ 五套测试全绿
 3. 提交并推送 `main`
 4. 打 tag 触发发布：`git tag v<版本> && git push origin v<版本>`
@@ -85,7 +102,8 @@ npm publish --registry=https://registry.npmjs.org --auth-type=web
 
 ## PR 检查清单
 
-- [ ] 四套测试通过
+- [ ] 五套测试通过（`npm test`）
+- [ ] 改了 `client-src/` 时已重新构建产物（`npm run build:check` 通过）
 - [ ] 新增/修改的规则有对应回归用例（虚构数据）
 - [ ] 幂等与还原往返未破坏
 - [ ] CHANGELOG 与 README 计数同步
