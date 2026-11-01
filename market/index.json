@@ -51,6 +51,14 @@
       },
       "versions": [
         {
+          "version": "0.2.51",
+          "publishTimestamp": 1793523838,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {}
+        },
+        {
           "version": "0.2.50",
           "publishTimestamp": 1793521433,
           "source": {
@@ -101,14 +109,6 @@
         {
           "version": "0.2.43",
           "publishTimestamp": 1790069247,
-          "source": {
-            "type": "npm"
-          },
-          "engines": {}
-        },
-        {
-          "version": "0.2.41",
-          "publishTimestamp": 1788616708,
           "source": {
             "type": "npm"
           },
