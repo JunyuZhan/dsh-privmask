@@ -3,6 +3,18 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [未发布]
+
+### 清理
+
+- **删除 `lib/policy.js`**（strict / balanced / permissive 的 `shouldRedact()` 与
+  `semanticPlaceholder()`）：该模块自加入起没有任何 importer（代码、测试、文档、类型声明、
+  CI 与 `exports` 映射均无引用），不参与实际决策——真正决定「遮什么」的是 `lib/rules.js` 的规则
+  与 `redactNames` / `redactOrgs` / `redactCredentials` 等设置项。它与在用模型语义相反
+  （其默认 `balanced` 档不遮人名/机构/地址，而插件默认遮），若被接线即成为隐私倒退，
+  故按死代码删除而非接通。运行时行为与对外 API 无变化；此前该文件会被 `files: ["lib"]`
+  打进 npm 包，现不再随包分发。加密映射库 `lib/vault.js` 已在上一次清理中删除，本次移除其另一半。
+
 ## [0.2.51] - 2026-11-01
 
 ### 插件市场
