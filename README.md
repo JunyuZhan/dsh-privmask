@@ -65,7 +65,7 @@ dsh plugin --profile web add dsh-privmask
 
 | 文档 | 内容 |
 |---|---|
-| [安装与升级](https://github.com/JunyuZhan/dsh-privmask/blob/main/docs/install.md) | dsh plugin 安装、DSH Desktop、配置文件模式、升级/卸载、环境排查 |
+| [安装与升级](https://github.com/JunyuZhan/dsh-privmask/blob/main/docs/install.md) | DSH Desktop 界面安装、让 agent 自行安装、CLI/配置文件模式、升级卸载、排查 |
 | [配置](https://github.com/JunyuZhan/dsh-privmask/blob/main/docs/configuration.md) | 全部配置键与默认值、快速开始、自定义词表与白名单 |
 | [脱敏机制](https://github.com/JunyuZhan/dsh-privmask/blob/main/docs/how-it-works.md) | 出站水瀑、落盘遮罩、入站还原、展示层还原、会话一致性 |
 | [安全模型与边界](https://github.com/JunyuZhan/dsh-privmask/blob/main/docs/security-model.md) | 按类别的默认策略、出站/日志/展示边界、责任声明 |
@@ -74,6 +74,7 @@ dsh plugin --profile web add dsh-privmask
 | [诊断与统计](https://github.com/JunyuZhan/dsh-privmask/blob/main/docs/diagnostics.md) | 控制台日志、结构化事件、诊断文件、适配检查 |
 | [已知限制](https://github.com/JunyuZhan/dsh-privmask/blob/main/docs/limitations.md) | 图片、启发式识别、内存映射、日志边界等 |
 | [开发与发布](https://github.com/JunyuZhan/dsh-privmask/blob/main/docs/development.md) | 开发环境、五套测试、CI、宿主适配自检、发版流程 |
+| [更新日志](https://github.com/JunyuZhan/dsh-privmask/blob/main/CHANGELOG.md) | 每个版本的变更、兼容性核对与修复记录 |
 
 ## 安全
 

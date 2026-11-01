@@ -71,12 +71,12 @@ const disclaimerBox: React.CSSProperties = {
   padding: '8px 10px',
   background: 'rgba(229, 72, 77, .06)',
 }
-/** 插件适配的 dsh 宿主范围（与 README 一致；功能随宿主能力自动降级） */
+/** 插件适配的 dsh 宿主范围（与 docs/compatibility.md 一致；功能随宿主能力自动降级） */
 export const DSH_SUPPORT = 'dsh 0.1.0-rc.6+（0.1.1-rc.2 / 0.1.5-rc.2 / 0.1.6-alpha.2 / 0.1.7-rc.2 / 0.2.1-rc.5 / 0.2.2-alpha.2 已核对）'
-/** 免责声明（完整版见 README「责任与边界」） */
+/** 免责声明（完整版见 docs/security-model.md「责任与边界」） */
 export const DISCLAIMER = '脱敏为启发式本地处理，无法保证零漏检；重要数据请自行评估并保留原文。'
 /** 插件版本（与 package.json 同步；accuracy 测试强制一致，避免发版漂移） */
-export const PLUGIN_VERSION = '0.2.48'
+export const PLUGIN_VERSION = '0.2.49'
 
 export function PrivmaskCard(props: PrivmaskCardInjected) {
   const [enabled, setEnabled] = useState<boolean | null>(null)
@@ -373,8 +373,8 @@ export function PrivmaskCard(props: PrivmaskCardInjected) {
             {copied ? '已复制 ✓' : '复制更新命令'}
           </button>
         </div>
-        <div style={body}>更新命令复制后在终端运行，并重启 dsh web 生效；复制状态文本可用于审计留档。</div>
-        <div style={body}>此处为常用开关；案号/出生日期/严格模式等其余选项请在配置文件中调整（$DSH_HOME/profiles/web/cordis.patch.yml）。</div>
+        <div style={body}>更新命令复制后在终端运行，并重启 DSH 生效；桌面版也可在「插件」页直接更新（见 docs/install.md）。</div>
+        <div style={body}>此处为常用开关；案号/出生日期/严格模式等其余选项请在配置文件中调整（$DSH_HOME/profiles/&lt;profile&gt;/cordis.patch.yml）。</div>
       </div>
       <div style={section}>
         <div style={sectionLabel}>关于</div>

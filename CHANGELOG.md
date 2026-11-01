@@ -3,7 +3,7 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [Unreleased]
+## [0.2.49] - 2026-11-01
 
 ### 工程化（按标准开源项目整理）
 
@@ -20,13 +20,15 @@
 
 ### 文档
 
-- **README 收敛为门面**（440 → ~130 行）：只保留一句话简介、特性、安装、快速开始与文档导航；
+- **README 收敛为门面**（440 → 约 100 行）：只保留一句话简介、特性、安装、快速开始与文档导航；
   安装排查、完整配置表、脱敏机制、安全模型、兼容性矩阵、CLI 工具、诊断、已知限制、开发与发布
   分别拆到 `docs/` 下的独立页面，由 [docs/README.md](docs/README.md) 统一索引。
 - **安装章节按实际用户分层**：DSH Desktop 界面安装（推荐，绝大多数用户）→ 让 agent 自行安装
   （含可直接复制的提示词、Desktop 自带 CLI 路径与校验清单）→ CLI（web/headless）→ npm → 配置文件模式；
   说明 Desktop 自带 Node 24 + pnpm 11 与内置 CLI，用户无需另装工具链。
-- 同步更新代码与工作流里的指引路径：`tools/dsh-compat-check.mjs`、`tools/redact-docx.mjs`、
+- 卡片「使用说明」不再写死 dsh web / profiles/web：更新命令与配置文件路径改为通用 profile 写法，
+  桌面版用户也能按提示操作。
+- 同步更新代码与工作流里的指引路径：	ools/dsh-compat-check.mjs、	ools/redact-docx.mjs、
   `.github/workflows/watch-upstream.yml`（自动 issue 的处理步骤）、CONTRIBUTING 与开发记录。
 
 ## [0.2.48] - 2026-11-01
@@ -49,7 +51,7 @@
 - `DEFAULT_VERSIONS` 改为 0.1.1-rc.2 + 0.2.1-rc.5 + 0.2.2-alpha.2；CI 的 compat job 同步巡检
   0.1.1-rc.2 / 0.1.5-rc.3 / 0.1.7-rc.2 / 0.2.1-rc.5 / 0.2.2-alpha.2 五个版本，
   `--upstream` 漂移检查恢复为全绿（三个 dist-tag 都在清单内）。
-- 核对结论与证据写进 `docs/dev/dsh-research.md` §5.5 与 README 版本适配段。
+- 核对结论与证据写进 `docs/dev/dsh-research.md` §5.5 与 `docs/compatibility.md` 的版本适配段。
 
 ### 修复（与 0.2.x 无关的既有缺陷）
 
@@ -98,7 +100,7 @@
 - 新增 `.github/workflows/watch-upstream.yml`：每天 09:00（北京时间）自动巡检，
   有漂移或关键缝缺失时 CI 报红并自动开/更新 issue。
 - 已核对并把 `0.1.5-rc.3` / `0.1.7-alpha.2` / `0.1.7-rc.2` 纳入已验证清单；
-  README 版本适配段与 `docs/dev/dsh-research.md` §5.3 记录了三代设置 API 的形态与策略。
+  `docs/compatibility.md` 的版本适配段与 `docs/dev/dsh-research.md` §5.3 记录了三代设置 API 的形态与策略。
 - **真机验证**：dsh `0.1.7-rc.2` 上卡片显示真实值（总开关/全面脱敏/机关开关），点击开关后
   profile 的 `cordis.patch.yml` 落盘 `redactNames: false` 等值，宿主启动无「entry did not activate」
   告警；dsh `0.1.5-rc.2` 上仍走 `register` + `settingsScope` 老路径，冒烟 8/8 通过。

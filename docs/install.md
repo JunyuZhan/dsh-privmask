@@ -11,7 +11,7 @@
 ## 方式一：DSH Desktop 界面（推荐）
 
 1. 侧栏打开**插件** → **已安装**标签 → **添加插件**；
-2. 输入包名 `dsh-privmask`（可带版本，如 `dsh-privmask@0.2.48`）；
+2. 输入包名 `dsh-privmask`（可带版本，如 `dsh-privmask@0.2.49`）；
 3. 安装源保持默认即可（Host 会自动在 npm 官方源与国内镜像之间探测最快的一个，
    也可以手动切到「中国大陆镜像源」或自定义地址）；
 4. 等**安装**完成，点**立即启用**；
@@ -36,6 +36,8 @@ DSH Desktop **自带 CLI 与运行时**（Node 24 + pnpm 11），只是不一定
 |---|---|
 | Windows | `%LOCALAPPDATA%\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd` |
 | macOS | `/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh` |
+
+> 安装位置不同时，在应用包内找 `resources/runtime/cli/bin/dsh`（Windows 为 `dsh.cmd`）。
 
 可直接把下面这段发给 agent：
 
