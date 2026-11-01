@@ -4,436 +4,81 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![CI](https://github.com/JunyuZhan/dsh-privmask/actions/workflows/test.yml/badge.svg)](https://github.com/JunyuZhan/dsh-privmask/actions/workflows/test.yml)
 
-DeepSeek Harness 本地脱敏插件：在请求发往云端大模型之前，将密钥、个人身份信息与中文实体替换为 `[REDACTED_类别_N]` 占位符；云端只看到脱敏内容，用户输入与工具结果在写入本地会话日志前同样遮罩。支持入站还原，模型返回的占位符在本地还原为原值，保证工具链与文档起草的精度。
+DeepSeek Harness 本地脱敏插件：请求发往云端大模型之前，把密钥、PII 与中文实体替换为
+`[REDACTED_类别_N]` 占位符；云端只看到脱敏内容，落盘日志同样遮罩，模型返回的占位符在本地还原。
 
-## 目录
-
-- [特性](#特性)
-- [安装](#安装)
-- [快速开始](#快速开始)
-- [配置](#配置)
-- [脱敏机制](#脱敏机制)
-- [安全模型](#安全模型)
-- [已知限制](#已知限制)
-- [测试与 CI](#测试与-ci)
-- [贡献](#贡献)
-- [安全](#安全)
-- [行为准则](#行为准则)
-- [发布](#发布)
-- [许可证](#许可证)
+> Local redaction for DeepSeek Harness — secrets, PII and Chinese entities are masked before
+> requests leave your machine, and restored locally in model output.
 
 ## 特性
 
-- **出站脱敏**：PEM/JWT/API Key、Bearer/Authorization、邮箱、电话、IPv4/IPv6、身份证（18/15 位）、统一社会信用代码、手机/座机、银行卡（Luhn 校验）、案号、车牌、护照/证件、微信号/QQ 号/律师执业证号（上下文识别）、出生日期、地址、公司名、检察机关/公安等机关（**法院/法庭名称默认保留**）
-- **入站还原**：模型输出文本与工具调用参数中的占位符在本地还原为原值；用户消息在日志中为占位符、经展示层（`sessionController.page/follow`，服务可见时）还原为原文显示，模型回复与工具调用参数以真值显示并落盘；还原值再次出站时重新脱敏，云端始终只看到占位符
-- **流式重组**：占位符被网络切分到多个 delta 时，尾部缓冲跨分片还原，流式显示不残留前缀；还原未命中（映射被逐出/模型改写）有统计与日志可见
-- **全面脱敏档**：隐私保护卡片可一键开启「全面脱敏（姓名/公司/机关）」，涉案金额、日期、案号仍保留（便于金额核算与时效判断）
-- **自定义敏感词编辑**：卡片内直接添加/删除当事人姓名、别名、机构简称，live 生效并持久化
-- **脱敏对照工具**：`npm run mask:preview -- <文件> [--redactFacts]` 输出原文 / 脱敏后（发往云端）/ 还原后三份对照，纯本地不发送数据
-- **日志脱敏**：用户输入（`agent/pre-step`）与工具结果（`tools/post-execute`）在写入会话日志前遮罩，原则上不落明文（dsh 个别内部事件会保留原文副本，见[已知限制](#已知限制)）；模型回复仍由入站还原为真值
-- **严格模式**：脱敏异常（failClosed）、未检查字段（strictUnknown）默认拒绝请求；非文本内容默认剥离（nonTextPolicy=strip），图片字节不出本地
-- **base64 文本预检**：开启 `preflightBase64` 后，携带 base64 载荷的媒体/文件块若可判定为 UTF-8 文本，会在本地解码、按同一套规则脱敏后回编码再上云；图片等二进制内容无法判定，仍走 `nonTextPolicy` 门禁
-- **离境审计**：每笔发往云端大模型的请求在本地追加一行 JSONL（默认开，可 `egressAudit: false` 关闭），记录决策（clean/masked/blocked/error）、脱敏字段与类别计数、媒体处置（剥离/预检/原样透传），`rawMedia: true` 即“有媒体原样离境”，可据此决定是否收紧配置
-- **审计摘要 CLI**：`node tools/audit-summary.mjs` 汇总离境审计 JSONL（决策/媒体/脱敏类别 Top），
-  存在 `rawMedia` 时打印告警并以退出码 2 提示，便于日常巡检与 CI 告警；纯本地读取
-- **PDF 脱敏预检 CLI**：`node tools/pdf-preflight.mjs <输入.pdf> --report out.json [--ocr]`
-  逐页提取文本层（扫描页可本地 OCR），走同一套脱敏规则后导出 `.redacted.txt` 预览与命中报告，
-  原 PDF 不被改写；预览即“云端会读到的内容”，用于上云前核对
-- **PDF 覆写式脱敏原型**：`node tools/redact-pdf.mjs <输入.pdf> --report out.json`
-  按文本层定位敏感片段 → gs 栅格化 → 像素涂黑 → 重组为图片型脱敏 PDF（无文本层，适合外发/留档）；
-  依赖 poppler + ghostscript，输出文件较大且不可再选字，属有损但有保障的覆写方案
-- **本地 OCR 兜底**：启用 `localOcr` 后图片附件先在本地（`~/.ocr-tool`）转成 OCR 文本，再走常规脱敏上云；OCR 失败默认以说明文本替代、`block` 策略下整体拒绝，绝不因“想发图片”而降级为原样透传
-- **隐私优先（默认）**：姓名、身份证、联系方式、地址、公司/单位名称等能唯一锁定对象的信息默认脱敏；案号、出生日期、涉案金额等公开可查或办案所需信息默认保留
-- **会话一致性**：同一会话内同一值跨请求映射到同一占位符，模型可跨轮关联实体；不同会话相互隔离
-- **类别化配置**：凭据 / 地址 / 姓名 / 公司 / 机关 / 案号 / 出生日期 分别开关，按场景组合
+- **出站脱敏**：PEM/JWT/API Key、邮箱/电话、身份证、统一社会信用代码、银行卡、车牌、地址、
+  公司名、机关名等；**法院/案号/出生日期/涉案金额默认保留**，办案判断需要真值。
+- **入站还原**：模型输出与工具调用参数中的占位符在本地还原为原值，再次出站时重新脱敏；
+  展示层在服务可见时把用户消息还原为原文显示。
+- **落盘遮罩**：用户输入、工具结果、`run_code` 子派发在写入会话日志前替换为占位符。
+- **流式与一致性**：占位符被切分到多个 delta 也能跨分片还原；同一会话内同值同号。
+- **严格模式**：脱敏异常 / 未知字段默认拒绝请求，非文本内容默认剥离，绝不静默放行明文。
+- **离境审计**：每笔发往云端的请求在本地记一行 JSONL，可用 `audit-summary` 汇总巡检。
+- **本地文件工具**：docx / 纯文本脱敏、PDF 预检与覆写式脱敏、图片本地 OCR（默认关）。
+- **多版本兼容**：对宿主事件/服务软探测、自动降级；0.1.1-rc.2 → 0.2.2-alpha.2 已逐缝核对。
 
 ## 安装
 
-### 通过 dsh CLI（推荐）
-
 ```sh
-dsh plugin --profile web add dsh-privmask
+dsh plugin --profile web add dsh-privmask      # DSH Desktop 换成 --profile desktop
 ```
 
-包通过 `dsh.bundle` 声明自动挂载到 profile 层栈，安装后重启 `dsh web` 生效。
-
-DSH Desktop（`desktop` profile）同理，把 `web` 换成 `desktop` 即可：
-
-```sh
-dsh plugin --profile desktop add dsh-privmask
-```
-
-`desktop` 下卡片出现在「设置 → 插件」的页签里（0.2.43 起；此前因客户端硬依赖
-宿主不存在的 `remote.pluginInventory` 而停在 PENDING，见
-[issue #2](https://github.com/JunyuZhan/dsh-privmask/issues/2)）。
-若该宿主没有客户端设置界面，则用配置文件模式：
-
-```yaml
-# $DSH_HOME/profiles/desktop/cordis.patch.yml
-- id: privmask
-  config:
-    enabled: true
-    redactNames: true
-    redactCompanies: true
-    redactOrgs: true
-    redactAddress: true
-    redactCredentials: true
-    customTerms: [张三, 某某公司]
-```
-
-升级与卸载：
-
-```sh
-dsh plugin --profile web update dsh-privmask
-dsh plugin --profile web remove dsh-privmask
-```
-
-> **兼容性**：按 `npm run dsh:compat` 实测核对过的宿主版本为
-> `@deepseek-ai/dsh` 0.1.0-rc.6 / 0.1.1-rc.2（旧官方线）、0.1.5-rc.2 / 0.1.5-rc.3、
-> 0.1.6-alpha.2、0.1.7-rc.2，以及 0.2.1-rc.5（当前 latest）与 0.2.2-alpha.2（alpha）；
-> 核心出站脱敏、落盘遮罩、设置开关在各线上均可用。run_code 子派发日志遮罩仅在宿主提供
-> `tools/ptc-dispatch-log`（dsh ≥ 0.1.2）时自动启用——0.2.2-alpha.2 起该水瀑随 PTC 执行器
-> 搬到 `@deepseek-ai/dsh-tool-executor-ptc`，水瀑名与签名不变（插件按事件名软注册，照常生效）；
-> 旧官方版无此事件属宿主能力差异；客户端模块依赖里 `@deepseek-ai/dsh-client-runtime` 自 0.1.2
-> 起已不存在（后继为 `@deepseek-ai/dsh-client-modules`），该条目在新版按未知依赖跳过，卡片仍正常加载。
-
-### 通过 npm
-
-```sh
-npm install dsh-privmask
-```
-
-### 环境与安装排查
-
-- **Node 版本**：声明 `>=18`，CI 在 Node 18/20/22 运行，本仓库同时在 Node 24 手工验证。
-- **官方包与开发线**：浏览器端同时适配官方 npm `@deepseek-ai/dsh`
-  （0.1.0-rc.6 / 0.1.1-rc.2 旧线，与 0.1.5-rc.2 当前 latest）；若默认 registry 是镜像源且新版本未同步，
-  更新时可显式指定官方源：`dsh plugin --profile web update dsh-privmask --registry=https://registry.npmjs.org`。
-- **“Already up to date”或安装报“最小发布期”**：pnpm 11 供应链策略会拦截刚发布（未过发布期）的版本，
-  把对应版本加入 profile 的 `pnpm-workspace.yaml` 白名单即可：
-  `minimumReleaseAgeExclude: [dsh-privmask@<版本号>]`。
-- **更新后必须重启**：`dsh plugin ... update` 只替换包文件，运行中的进程仍加载旧代码；
-  重启后访问令牌会变化（dsh web 每次启动打印新地址），后台服务（如 LaunchAgent）请用
-  `launchctl bootout/bootstrap` 重启，再打开启动日志末尾打印的带 token 地址。
-- **profile 差异**：隐私保护卡片出现在任何提供 `slots` / `locale` / `settingsScope` 的客户端运行时里
-  （`web` profile，以及 DSH Desktop 的 `desktop` profile；后者 0.2.43 起可用，见
-  [issue #2](https://github.com/JunyuZhan/dsh-privmask/issues/2) 的根因修复）；
-  headless/无客户端界面的 profile 使用同一套 host 规则与配置文件
-  （`$DSH_HOME/profiles/<name>/cordis.patch.yml`），
-  展示层还原、运行时开关等浏览器能力自动降级。
-
-### docx 脱敏工具（本地 CLI，0.2.39+）
-
-纯本地、保留原格式，输出“脱敏副本”，不修改原文件：
-
-```sh
-node tools/redact-docx.mjs input.docx                # 生成 input.redacted.docx
-node tools/redact-docx.mjs input.docx output.docx    # 指定输出路径
-node tools/redact-docx.mjs input.docx --whole-paragraph  # 按整段合并识别跨 run 敏感值
-node tools/redact-docx.mjs input.docx --config cfg.json   # 按任务配置脱敏类别（键同 README 配置表）
-node tools/redact-docx.mjs a.docx b.docx --out-dir out --report report.json  # 批量 + 报告
-node tools/redact-docx.mjs a.docx b.docx --out-dir out --html-report 汇总.html # 批量 + HTML 汇总
-```
-
-占位符编号在整个文档中单调递增。默认按 Word 文本节点（`<w:t>`）处理；
-若敏感值被 Word 拆到多个 run（如“邮箱 alice.”与“wang@…”分属两段），
-请加 `--whole-paragraph`（会把段落格式并入首个 run，输出前用 Word 抽查）。
-涉密/合规场景请抽样核对后再使用。
-
-纯文本（.txt/.md/导出文本）可用配套 CLI：
-
-```sh
-node tools/redact-text.mjs input.txt                # 生成 input.redacted.txt
-node tools/redact-text.mjs input.txt out.txt --config cfg.json
-```
+装完重启宿主生效。headless / 无客户端界面的 profile 用配置文件模式接入，
+镜像源、pnpm 最小发布期、更新后必须重启等排查项见[安装与升级](https://github.com/JunyuZhan/dsh-privmask/blob/main/docs/install.md)。
 
 ## 快速开始
 
-默认配置即「隐私优先」：密钥凭据、地址、姓名、公司/单位名称与 PII 脱敏；案号、出生日期、涉案金额保留（公开可查或办案所需）。
+默认配置即「隐私优先」：凭据、地址、姓名、公司/单位名与 PII 脱敏，案号/出生日期/金额保留。
+按需在 profile 的 `cordis.patch.yml` 里覆盖，或在客户端卡片上直接改（live 生效）：
 
 ```yaml
-# $DSH_HOME/profiles/web/cordis.patch.yml 中按 id 覆盖
+# $DSH_HOME/profiles/web/cordis.patch.yml
 - id: privmask
   config:
     enabled: true
-    redactCredentials: true
-    redactAddress: true
     redactNames: true
     redactCompanies: true
     redactOrgs: true
-    redactCaseNumbers: false
-    redactDob: false
-    nonTextPolicy: strip
-    failClosed: true
+    customTerms: [张三, 某某公司]
 ```
 
-需要案号/出生日期也脱敏时，将 `redactCaseNumbers: true` / `redactDob: true`；需要严格身份证校验时保持 `strictId18: true`（默认）。
+完整配置键与默认值见[配置](https://github.com/JunyuZhan/dsh-privmask/blob/main/docs/configuration.md)。
 
-## 配置
+## 文档
 
-| 键 | 默认 | 说明 |
-|---|---|---|
-| `enabled` | `true` | 总开关 |
-| `cnEntities` | `true` | 中文实体识别总开关 |
-| `redactCredentials` | `true` | 凭据类脱敏：PEM、JWT、API Key、Bearer/Authorization、密码等 |
-| `redactAddress` | `true` | 地址类脱敏：省市区乡、住址、户籍地、送达地址等 |
-| `redactNames` | `true` | 姓名脱敏：姓名是能唯一锁定当事人的信息 |
-| `redactCompanies` | `true` | 公司名称脱敏：法人唯一标识 |
-| `redactOrgs` | `true` | 机关/单位名称脱敏；**法院/法庭名称默认保留**（公开审判机关名，且案号代字已写明法院；确需遮罩某个法院时把它的全称加入 `customTerms`） |
-| `redactCaseNumbers` | `false` | 案号脱敏：默认保留（公开案件标识，管辖/关联判断需要真值） |
-| `redactDob` | `false` | 出生日期脱敏：默认保留（非唯一信息，年龄/时效计算需要真值） |
-| `customTerms` | `[]` | 自定义敏感词表：精确子串匹配即脱敏，不受角色上下文限制（当事人姓名/别名/机构简称）；面板输入框支持用分号/逗号/顿号分隔一次添加多个 |
-| `preserveValues` | `[]` | 白名单：命中规则的值也原样保留（标记放行误报） |
-| `strictId18` | `true` | 身份证 18 位严格校验：仅校验位合法的号码脱敏；关闭后日期段合理或带「身份证号」上下文的号码也脱敏 |
-| `restoreInbound` | `true` | 入站还原：云端返回的占位符在本地还原为原值（响应显示、工具执行），下次出站重新脱敏；历史展示层还原依赖 `persistMapping: true` |
-| `nonTextPolicy` | `strip` | 非文本内容策略：`strip`=移除后放行、`block`=拒绝请求、`allow`=透传（0.2.41 起默认仍需 `allowRawMedia: true` 才真正放行） |
-| `allowRawMedia` | `false` | 显式承担风险后才允许图片/文件原样透传（默认 false：`allow` 也拒绝，先本地 OCR/脱敏再发送更符合“凡离境必先脱敏”） |
-| `preflightBase64` | `false` | base64 文本预检：媒体/文件块中可判定为 UTF-8 文本的 base64 载荷，先本地解码脱敏再回编码上云；二进制（如图片像素）与不可判定内容仍按 `nonTextPolicy` 处置（不是 OCR） |
-| `longTokens` | `true` | 长 hex/base64 串脱敏 |
-| `redactToolMeta` | `true` | 工具描述/参数 schema 中的敏感信息脱敏（担心遮罩影响模型理解工具时可设 false） |
-| `redactPaths` | `false` | 绝对路径脱敏（开启会破坏文件工具的路径回传） |
-| `persistMapping` | `true` | 同一会话内跨请求保持同一值映射同一占位符；关闭则每请求重新编号，且浏览器历史展示层无法还原已落盘的占位符（流内实时还原不受影响） |
-| `dropSessionId` | `true` | 移除 `x-deepseek-harness-session-id` 请求头 |
-| `failClosed` | `true` | 严格模式：脱敏异常时拒绝请求，绝不把未脱敏数据发往云端 |
-| `strictUnknown` | `true` | 严格模式：发现未检查的未知字段（含嵌套的非普通对象，如 Buffer/类实例）时拒绝请求 |
-| `egressAudit` | `true` | 离境审计：每笔发往云端的 llm 请求写一行本地 JSONL（`$DSH_HOME/privmask-egress.jsonl`，超过 10MB 轮转为 `.1`）；只记决策与计数，不记消息原文 |
-| `localOcr` | `false` | 本地 OCR 兜底：启用后图片附件在 llm 水瀑前用 `~/.ocr-tool` 转成本地 OCR 文本，再走常规脱敏后上云（图片字节不出本地）；与 dsh-image-text-fallback 可叠加。关闭时图片仍按 `nonTextPolicy` 处置 |
-| `localOcrCommand` | `[]` | 高级/测试：自定义 OCR 命令 argv（空则使用默认 `~/.ocr-tool/ocr.py` 调用） |
-| `logRedactions` | `true` | 每次脱敏打印一行统计日志 |
-
-## 脱敏机制
-
-插件挂载在 `llm/stream` 水瀑（dsh 唯一的请求边界），拦截发生在请求到达 adapter（云端边界）之前。机制要点：
-
-- **只处理会真正上云的内容**：adapter 序列化时只发送 `message.content` 内容块；消息的 `source` 元数据（notice 摘要、snapshot 片段、replayState）不会上云，因此不在此列。
-- **reasoning 内容会上云**：adapter 将 `reasoning` 块序列化为 `reasoning_content` 发送，本插件同样脱敏。
-- **辅助调用同样脱敏**：`purpose: compaction / session-title` 的请求同样经过 `llm/stream`。
-- **原请求保持不变**：agent-loop 构建的请求被深冻结并用 WeakSet 标记；本插件生成脱敏副本重入水瀑，原请求对象不修改；用户输入在落盘前已由 `agent/pre-step` 遮罩。
-- **日志落盘前遮罩**：`agent/pre-step` 改写进入步骤的用户消息，`tools/post-execute` 改写工具结果，`tools/ptc-dispatch-log`（dsh ≥ 0.1.2）改写 run_code 子派发日志——在写入 `user/message` / `tool/result` / `tool/code-dispatch` 事件前即替换为占位符；与 `llm/stream` 共用同一会话映射，编号一致，且 `llm/stream` 仍作为辅助调用（compaction/session-title）的兜底。
-- **展示层还原**：浏览器通过 `sessionController.page/follow` 读取会话；host 侧服务可见时插件包装这两个方法，在返回浏览器前按会话映射把占位符还原为原值——用户消息的界面显示为原文（其落盘副本仍为占位符），模型回复与工具调用参数因入站还原以真值显示并落盘（`restoreInbound: false` 时关闭；服务不可见时界面与日志一致为占位符，见[已知限制](#已知限制)）。
-- **入站还原**：模型返回流中的占位符按会话映射在本地还原为原值；还原内容再次出站时重新脱敏。
-- **会话头**：adapter 会发送 `x-deepseek-harness-session-id` 请求头，`dropSessionId` 默认移除。
-
-## 安全模型
-
-本插件以「敏感数据不出本地」为目标，按数据类别区分策略：
-
-| 类别 | 默认 | 理由 |
-|---|---|---|
-| 密钥凭据 | 脱敏 | 模型永远不需要，脱敏零损失 |
-| 地址（省市区乡/住址） | 脱敏 | 当事人隐私核心；起草文书时由入站还原写回真值 |
-| 姓名 | 脱敏 | 能唯一锁定当事人的信息 |
-| 公司/单位名称 | 脱敏 | 法人/单位唯一标识 |
-| 法院/法庭名称 | 保留 | 公开审判机关名，不指向自然人；案号里的法院代字本就写明法院（脱了等于白脱），且管辖判断与「此致 XX 法院」起草需要真值。确需遮罩时把法院全称加入 `customTerms`（自定义词表优先于内置规则） |
-| 案号 | 保留 | 公开案件标识，不指向个人；管辖/关联判断需要真值 |
-| 出生日期 | 保留 | 非唯一信息；年龄/时效计算需要真值 |
-| 涉案金额 | 保留 | 诉讼费、违约金、利息计算依赖金额 |
-| 邮箱/电话/身份证等 PII | 脱敏 | 高敏感身份信息 |
-
-出站边界：云端不可逆地只能看到占位符。日志边界：用户输入与工具结果落盘前已遮罩为占位符；模型回复（含工具调用参数）经入站还原以真值落盘——这是方案取舍（保证工具执行与界面显示真值）。展示边界：浏览器读取会话时经 `sessionController.page/follow` 还原为原文（该服务在部分宿主组合不可见时，界面与日志一致为占位符，见[已知限制](#已知限制)）。入站还原仅发生在本地内存与会话日志，还原值一旦再次出站即被重新脱敏。
-
-## 责任与边界
-
-- 本插件的脱敏基于**启发式规则**（上下文、词表、校验位），不保证零漏检、零误伤；
-  对需要高保证的合规场景，请自行抽样验证，并保留可信原文副本。
-- 插件按 MIT 许可证“按现状”提供；作者不对因漏脱敏、误脱敏或使用本插件造成的
-  数据泄露、业务损失或其他后果承担责任。
-- 遮罩会改变发送给云端模型的内容：请按任务重要性评估是否开启对应类别，
-  避免对需要精确数值/路径/格式的任务过度脱敏而影响推理结果。
-
-## 版本适配与升级策略
-
-- **已实测核对的宿主版本**：0.1.1-rc.2（旧官方线）、0.1.5-rc.2 / 0.1.5-rc.3、0.1.6-alpha.2、
-  0.1.7-rc.2，以及 0.2.1-rc.5（当前 latest）与 0.2.2-alpha.2（alpha）。
-- **设置 API 有三代形态，插件全部软探测**：`settingsScope`（0.1.2–0.1.5）与 `remote.settings`
-  （0.1.7+ 又改回来）在客户端二选一；宿主侧 `settings.register`（旧）与 `settings.configure`
-  （0.1.7 的 SettingsForms）二选一。两代都没有时卡片仍注册，只在卡片内提示改用配置文件模式。
-  客户端模块级 `inject` 因此只剩 `slots` / `locale` 两个各宿主都有的服务——硬依赖某个设置服务
-  会让卡片整块停在 PENDING（issue #2 的教训，0.1.7 差点再犯一次）。
-- **0.1.7 的 `volatile` 字段是活引用**：0.1.7 只把标了 `.volatile()` 的字段放进设置表单，
-   而且把它们传成 `{ get(), [write] }` 盒子（不是普通值）。插件按能力派生 volatile 标记
-   （老 schemastery 没有该方法），校验前解盒、并在每个钩子入口探测一次变更——用户在卡片上
-   改开关**无需重启进程**即可生效。已在 dsh 0.1.7-rc.2 真机验证读写与落盘。
-  核对方式是 `npm run dsh:compat`：按版本下载缝所在包到本机 `.dsh-versions/`
-  （已 gitignore，只留存不提交），逐个断言缝仍存在并打印「版本 × 缝」矩阵，
-  必需缝缺失即退出码 1；同一份缓存也可直接解两个版本做 diff。
-- **0.2.x 复核（0.2.48）**：0.2.1-rc.5（latest/next）与 0.2.2-alpha.2（alpha）上插件押注的缝
-  全部仍在，设置 API 沿用 0.1.7 的 `SettingsForms` + volatile 活引用形态，**插件无需改代码**；
-  客户端侧仍是 `remote.settings`（`settingsScope` 已随 0.1.5 线退场），
-  `sessionController` 的可见性判定与降级声明不变。唯一结构变化是 `tools/ptc-dispatch-log`
-  在 0.2.2-alpha.2 随 PTC 执行器搬到新包 `@deepseek-ai/dsh-tool-executor-ptc`
-  （水瀑名与签名不变，按事件名软注册照常生效），自检脚本已按「两种归属任一命中」处理。
-- **0.1.5-rc.2 / 0.1.6-alpha.2 核对结论**：`llm/stream`、`prepareCall`、`resolveModelInfo`、`agent/pre-step`、
-  `tools/post-execute`、`tools/ptc-dispatch-log`、`settings.register`、`attachments.readImage`、
-  `x-deepseek-harness-session-id` 全部仍在且签名兼容；`GenerateOptions` 全 12 个字段
-  （含 `reasoningEffort` / `temperature` / `maxTokens` / `stop` / `purpose`，0.1.1 起即存在）
-  被脱敏管线原样保留，
-  其中 `stop` 内的敏感值与消息共用同一占位符（模型只见占位符，停止串必须同步改写才匹配得上），
-  回归见可靠性测试 AF1-AF5。
-- 插件对 dsh 内部能力采用**软探测/自动降级**：不存在的宿主事件（如旧版没有
-  `tools/ptc-dispatch-log`）不注册不报错；设置、展示层等服务不可见时退化为配置文件模式。
-- manifest 依赖行只保留各版本模块表都存在的公共模块，并有自动化回归防止误加回版本专属依赖；
-  `dsh.client.inject` 里已不存在的条目由 `npm run dsh:compat` 显式列出（宿主按未知条目跳过）。
-- **dsh 升级建议**：升级宿主前先跑 `npm run dsh:compat <新版本>` 看缝是否还齐，
-  再跑仓库测试（`npm test`）；若 dsh 客户端模块表/事件名发生变化，优先检查卡片是否正常出现、
-  控制台是否有 `展示层还原未安装` 类告警，再按告警决定是否等新版本插件。
-
-## 跨平台支持
-
-核心链路（出站脱敏、入站还原、落盘遮罩、词表/开关、文本与 docx CLI、`npm run dsh:compat`）
-是纯 Node 实现，macOS / Linux / Windows 无差异，只依赖 Node ≥18。
-
-只有「本地 PDF / OCR」这类必须借外部程序的工具存在平台差异，0.2.44 起已按平台自动适配：
-
-| 能力 | 依赖 | 平台差异与处理 |
-|---|---|---|
-| `tools/pdf-preflight.mjs`、`tools/redact-pdf.mjs` | poppler（`pdftotext`/`pdfinfo`）+ ghostscript | POSIX 下 ghostscript 叫 `gs`，Windows 下是 `gswin64c` / `gswin32c`；0.2.44 起按平台自动探测并在缺失时给出对应安装指引（`choco` / `scoop` / `brew` / `apt`） |
-| `localOcr`（默认关） | `~/.ocr-tool` 本地视觉服务 | Python venv 布局不同：Windows 是 `venv\Scripts\python.exe`，POSIX 是 `venv/bin/python`；0.2.44 起自动选择（也可用 `localOcrCommand` 完全接管） |
-| docx / 纯文本 / 审计摘要 / 对照工具 | 无外部依赖 | 纯 JS，跨平台一致 |
-
-文本保真方面，Windows 的 CRLF 换行在脱敏后原样保留（0.2.43 及以前，地址规则会把行尾的 `\r`
-一起吞掉，导致整行从 `\r\n` 变成 `\n`；0.2.44 修正，回归见 reliability AG1/AG1b）。
-
-宿主侧：`web` profile 与 DSH Desktop（`desktop` profile）都可用。Desktop 的客户端运行时没有
-`remote.pluginInventory`，卡片会改用 `settingsScope` 命名空间的可用性推断状态（就绪 = 插件已启用），
-因此状态行同样有值，不再显示「未知」；其余开关照常
-（见 [issue #2](https://github.com/JunyuZhan/dsh-privmask/issues/2)）。
-
-诚实声明：Windows 上的行为由代码审查 + 跨平台回归（AG1–AG4）保证，**尚未在 Windows 真机跑过**；
-遇到问题请附平台与复现步骤提 issue。
-
-## 已知限制
-
-- **图片默认不直发**：非文本内容默认剥离（不发送）；启用 `localOcr` 后图片先在本地
-  OCR 成文本再脱敏上云；若确需多模态直发图片，仅设 `nonTextPolicy: allow` 已不足——
-  还必须显式设置 `allowRawMedia: true` 承担原样发送风险（默认会拒绝）。
-- **启发式识别**：姓名/公司/地址等基于角色上下文、姓氏库与正则规则，复杂句式下可能漏检或误伤。
-- **自定义词表为精确子串匹配**：`customTerms` 中的词命中即脱敏，包含该词的长词同样命中（如词表含「张三」时「张三丰」也会被命中）；误报可用 `preserveValues` 标记放行。
-- **证件/信用代码校验**：带「身份证号/统一社会信用代码」等明确标注的号码**始终脱敏**（不依赖校验位）；
-  无上下文的号码默认仅校验位合法者脱敏（避免误伤订单号），可关闭 `strictId18` 或加入自定义词表兜底。
-- **文件名与路径默认保留**（`redactPaths: false`），开启后文件类工具链会断裂。
-- **日志中模型回复为真值**：方案取舍下 assistant 消息（模型回显的姓名/公司等）与工具调用参数在日志中为真值；如需日志完全无明文，需关闭入站还原或使用更严格的落盘方案。
-- **界面展示还原依赖 host 侧 `sessionController` 可见**：部分 dsh 组合（如插件挂在 profile 外层、
-  `sessionController` 注册在 web-app 内层 include）中，插件探测不到该服务，
-  用户自己消息的界面显示与日志一样为占位符（安全更保守，但可读性下降）；该场景会在启动/请求日志打印
-  `展示层还原未安装` 告警。
-- **`agent/inbox/spliced` 事件保留用户消息原文**：dsh 在用户消息进入 inbox 队列时以原文落盘该会话事件，该事件早于 `agent/pre-step` 且无插件改写缝（`session/event` 为只读观察），privmask 无法遮罩这一份日志副本；模型上下文与出站请求仍使用遮罩后的 `user/message`，不受影响。
-- **`nonTextPolicy: block` 时用户消息会被整体拒绝**：图片/文件块在 `agent/pre-step` 即触发步骤拒绝（`reject`），不写入日志也不上云。
-- **内存映射**：占位符映射仅存于内存，进程重启后会话内映射即失效；单类别超过 2000 个不同值后最旧映射被逐出（编号不复用），被逐出的旧占位符不再还原；引擎另有 200 个会话上限（超限淘汰最旧会话），极端规模下内存占用可能仍较大；云端侧不可逆，无法还原。
-- **文本与图片的本地化处理边界**：对话、工具文本在出站前脱敏；
-  docx 自 0.2.39 起提供本地文本层脱敏工具（不跨分段识别，见上方说明）；
-  base64 文本预检自 0.2.42 起可对“文本编码成 base64”的载荷做解码脱敏（默认关）；
-  图片自 0.2.42 起可通过 `localOcr` 在本地 OCR 成文本后脱敏上云（默认关，依赖 `~/.ocr-tool`）；
-  PDF 自 0.2.42 起提供 `tools/pdf-preflight.mjs`（预检与脱敏文本导出）与
-  `tools/redact-pdf.mjs`（覆写式图片型脱敏，依赖 poppler+ghostscript，有损）；
-  保留文本层的原样编辑型 PDF 脱敏仍属长期规划。
-
-## 测试与 CI
-
-开发环境（Node ≥ 18）：
-
-```sh
-npm install        # 运行时依赖 + peer + 构建/测试工具
-npm run build      # client-src → lib/client.js（产物由源码生成，不要手改）
-npm test           # 五套测试：self / accuracy / reliability / fuzz / docx
-```
-
-单套运行（定位问题用）：
-
-```sh
-node test/self-test.js        # 15 项功能回归（端到端拦截 + 中文实体 + 法院保留/检察机关脱敏）
-node test/reliability-test.js # 201 项可靠性（边界/幂等/防误伤/校验/配置/姓名边界/图片策略/base64文本预检/本地OCR兜底/严格模式/入站还原/类别策略/性能/编号单调/交叉规则/日志遮罩（含 post-execute 宿主默认决策）/展示层还原/词表白名单/delta重组/兼容矩阵/settings惰性注册/settings-forms新形态/volatile活引用/词表热更新/字符串 content 还原/出站脱敏/离境审计/审计摘要CLI/PDF预检CLI/PDF覆写脱敏/dsh0.1.5请求形态/跨平台CRLF与路径/病理输入时间上限）
-node test/accuracy-test.js    # 26 项准确性（法律文档矩阵/凭据/PII校验/证件与信用代码上下文/复姓/泛化机构与村镇/姓名标签边界/客户端版本一致性）
-node test/docx-test.js        # docx 本地脱敏（格式保留/非文本条目原样/占位符写入）
-node test/fuzz-test.js        # 300 例随机文本 × 2 断言（不崩 + 幂等，共 600 断言）
-```
-
-CI（GitHub Actions）在每次 push / PR 时跑三个 job：
-
-- **test**：ubuntu，Node 18/20/22 三档，`npm ci` → `npm run build:check`（产物与源码一致）→ `npm test`；
-- **cross-platform**：macOS + Windows 真机跑同一套测试（Windows 上的 CRLF/路径/venv 布局只有真机跑才算数）；
-- **compat**：`node tools/dsh-compat-check.mjs` 巡检 0.1.1-rc.2 / 0.1.5-rc.3 / 0.1.7-rc.2 /
-  0.2.1-rc.5 / 0.2.2-alpha.2 的宿主缝，
-  上游改事件名/服务名/客户端模块时在这里报警，而不是等用户发现。
-
-宿主适配自检（需要联网，不进 `prepublishOnly`，避免破坏离线发布）：
-
-```sh
-npm run dsh:compat                 # 核对 0.1.1-rc.2 与当前 latest/alpha（0.2.1-rc.5 / 0.2.2-alpha.2）
-npm run dsh:compat -- 0.1.7-rc.2   # 核对指定版本（已核对，结论同上）
-npm run dsh:compat -- --upstream   # 只看上游 dist-tags 是否出现未核对的新版本（定时监控用）
-```
-
-**上游监控**：`.github/workflows/watch-upstream.yml` 每天 09:00（北京时间）跑一次
-`--upstream --check`——上游出现未核对版本、或关键宿主缝/设置 API 消失时，CI 报红并自动
-开（或追加评论到）一条 issue。已核对的版本清单维护在 `tools/dsh-compat-check.mjs` 的
-`VERIFIED_VERSIONS` 里。
-
-发版冒烟（需要本机已装 dsh 且 profile 里装了本插件；不调模型、不花钱）：
-
-```sh
-npm run smoke                      # 默认 --profile web
-npm run smoke -- --profile desktop # 指定 profile
-```
-
-它断言四件实际踩过坑的事：插件确实挂载（`[privmask] 适配检查`）、设置命名空间已注册、
-客户端模块表含 `dsh-privmask/client.js`（界面能看到卡片）、profile 里装的就是仓库这份代码
-（版本一致，可用 `--allow-version-drift` 放宽）。退出码 0/1，可直接进 CI 或发版清单。
-
-发布本身由 `.github/workflows/publish.yml` 承担：打 tag（`v<版本>`）→ 校验 tag 与
-`package.json` 一致 → 跑测试 → `npm publish --provenance`（npm Trusted Publishing/OIDC，
-无需 2FA；版本已存在时自动跳过）。
-
-## 诊断与统计
-
-- **控制台日志**：所有关键动作以 `[privmask]` 前缀输出，如启动配置、每次脱敏统计
-  （类别与次数）、非文本拦截原因、运行时设置 live 更新等；`logRedactions: false` 时仅保留错误与告警。
-- **结构化事件**：每次请求/落盘遮罩/拦截/还原未命中都会发出 `privmask/stats` 事件
-  （`ctx.emit`），`kind` 为 `redacted / logRedacted / blocked / error / restoreMiss / settingsUpdated` 等。
-- **还原未命中**：模型返回无法还原的占位符时（映射被逐出或模型改写），日志会给出
-  sessionId、未命中数量与最多 3 个占位符样例，便于判断是否因会话超长逐出导致。
-- **诊断文件**：启动与还原关键路径另写一份 `$DSH_HOME/privmask-restore.log`（默认 `~/.dsh/`），
-  用于在无控制台可读的真实环境（如 LaunchAgent）排查入站还原问题。
-- **适配检查**：插件启动时会打印一行 `[privmask] 适配检查: ...`，
-  明确列出 llm/settings/模块表条目/sessionController 可见性与降级项；
-  升级宿主后先看这一行，能立刻判断哪些能力降级了。
-
-## 脱敏对照工具
-
-本地检查一份文本在脱敏前后的样子（不会发送任何数据）：
-
-```sh
-npm run mask:preview -- 案情.txt            # 默认档：隐私实体脱敏，金额/日期/案号保留
-npm run mask:preview -- 案情.txt --redactFacts   # 全面档：姓名/公司/机关也脱敏
-```
-
-输出三份：原文 / 脱敏后（发往云端的样子）/ 还原后（模型产出经本地还原的样子），以及占位符统计。
-
-## 贡献
-
-- 开发/提交流程见 [CONTRIBUTING.md](CONTRIBUTING.md)
-- 发现漏检/误伤或功能建议：提交 [Issue](https://github.com/JunyuZhan/dsh-privmask/issues)（附测试样例，便于回归）
-- 改进规则或修复 bug：提交 [PR](https://github.com/JunyuZhan/dsh-privmask/pulls)
-- 提交前请确保五套测试全部通过（`npm test`），改动 `client-src/` 时跑过 `npm run build:check`
-- 机制研究与上游版本适配复核记录在 [docs/dev/](docs/dev/README.md)（**开发记录，非用户文档**）
+| 文档 | 内容 |
+|---|---|
+| [安装与升级](https://github.com/JunyuZhan/dsh-privmask/blob/main/docs/install.md) | dsh plugin 安装、DSH Desktop、配置文件模式、升级/卸载、环境排查 |
+| [配置](https://github.com/JunyuZhan/dsh-privmask/blob/main/docs/configuration.md) | 全部配置键与默认值、快速开始、自定义词表与白名单 |
+| [脱敏机制](https://github.com/JunyuZhan/dsh-privmask/blob/main/docs/how-it-works.md) | 出站水瀑、落盘遮罩、入站还原、展示层还原、会话一致性 |
+| [安全模型与边界](https://github.com/JunyuZhan/dsh-privmask/blob/main/docs/security-model.md) | 按类别的默认策略、出站/日志/展示边界、责任声明 |
+| [兼容性与升级](https://github.com/JunyuZhan/dsh-privmask/blob/main/docs/compatibility.md) | 已核对宿主版本、设置 API 三代形态、跨平台差异、升级建议、上游监控 |
+| [命令行工具](https://github.com/JunyuZhan/dsh-privmask/blob/main/docs/tools.md) | 脱敏对照、docx/纯文本、PDF 预检与覆写、审计摘要、工具依赖 |
+| [诊断与统计](https://github.com/JunyuZhan/dsh-privmask/blob/main/docs/diagnostics.md) | 控制台日志、结构化事件、诊断文件、适配检查 |
+| [已知限制](https://github.com/JunyuZhan/dsh-privmask/blob/main/docs/limitations.md) | 图片、启发式识别、内存映射、日志边界等 |
+| [开发与发布](https://github.com/JunyuZhan/dsh-privmask/blob/main/docs/development.md) | 开发环境、五套测试、CI、宿主适配自检、发版流程 |
 
 ## 安全
 
-本插件以「云端与日志不见明文」为安全目标。发现隐私泄漏、绕过脱敏或安全缺陷时，
-请按 [SECURITY.md](SECURITY.md) 报告（不要在公开 Issue 中贴真实敏感数据）。
+目标是「云端与日志不见明文」，但脱敏基于启发式规则，**不保证零漏检、零误伤**；
+高保证合规场景请自行抽样验证并保留可信原文副本。各类别默认策略与边界见
+[安全模型与边界](https://github.com/JunyuZhan/dsh-privmask/blob/main/docs/security-model.md)，
+覆盖不到的场景见[已知限制](https://github.com/JunyuZhan/dsh-privmask/blob/main/docs/limitations.md)。
+发现隐私泄漏、绕过脱敏或安全缺陷，请按 [SECURITY.md](https://github.com/JunyuZhan/dsh-privmask/blob/main/SECURITY.md)
+报告，不要在公开 Issue 里贴真实敏感数据。
 
-## 行为准则
+## 贡献
 
-参与本项目即表示同意 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)。
-
-## 发布
-
-```sh
-npm login
-npm publish
-```
-
-`prepublishOnly` 会先运行全部测试，通过才允许发布。版本变更记录见 [CHANGELOG.md](CHANGELOG.md)。
+- 开发/提交流程与编码约定见 [CONTRIBUTING.md](https://github.com/JunyuZhan/dsh-privmask/blob/main/CONTRIBUTING.md)
+- 提交前跑 `npm test`；改了 `client-src/` 再跑 `npm run build:check`
+- 机制研究与上游版本适配的复核记录在 [docs/dev/](https://github.com/JunyuZhan/dsh-privmask/tree/main/docs/dev)（开发记录，非用户文档）
+- 参与本项目即表示同意 [CODE_OF_CONDUCT.md](https://github.com/JunyuZhan/dsh-privmask/blob/main/CODE_OF_CONDUCT.md)
 
 ## 许可证
 

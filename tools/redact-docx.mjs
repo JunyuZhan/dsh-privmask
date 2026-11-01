@@ -34,7 +34,7 @@ let config = {}
 if (configIdx >= 0) {
   const file = args[configIdx + 1]
   if (!file) {
-    console.error('用法：--config <配置文件.json>（可选，键同 README 配置表）')
+    console.error('用法：--config <配置文件.json>（可选，键同 docs/configuration.md 配置表）')
     process.exit(2)
   }
   config = JSON.parse(await readFile(resolve(file), 'utf8'))

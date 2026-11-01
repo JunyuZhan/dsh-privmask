@@ -151,7 +151,7 @@ async function ensurePackage(name, version, versionDir) {
   return { ok: true, cached: false, dir: target };
 }
 
-/** 我们已经逐缝核对过、并写进 README 的宿主版本；`--upstream` 用它判断「上游是否出现未核对版本」。 */
+/** 我们已经逐缝核对过、并写进 docs/compatibility.md 的宿主版本；`--upstream` 用它判断「上游是否出现未核对版本」。 */
 const VERIFIED_VERSIONS = [
   '0.1.1-rc.2', '0.1.5-rc.2', '0.1.5-rc.3', '0.1.6-alpha.2', '0.1.7-alpha.2', '0.1.7-rc.2',
   '0.2.1-rc.5', '0.2.2-alpha.2',
@@ -196,7 +196,7 @@ if (upstreamOnly) {
     } else {
       console.error('\n[privmask] 上游出现未核对版本：' + drifted.map((d) => d.tag + '=' + d.version).join(', ')
         + '\n  处理：node tools/dsh-compat-check.mjs ' + drifted.map((d) => d.version).join(' ')
-        + '，核对通过后把版本加进本脚本的 VERIFIED_VERSIONS 与 README 的版本适配段');
+        + '，核对通过后把版本加进本脚本的 VERIFIED_VERSIONS 与 `docs/compatibility.md` 的版本适配段');
       process.exit(1);
     }
   } else {
@@ -264,9 +264,9 @@ if (failures > 0) {
   console.error('\n[privmask] 适配自检失败：' + failures + ' 个必需缝缺失，插件需要适配后再发布');
   process.exitCode = 1;
 } else if (driftFound) {
-  // 缝都在 = 新版本可以直接用，但清单还没更新；仍然报红，提醒把版本补进 VERIFIED_VERSIONS 与 README
+  // 缝都在 = 新版本可以直接用，但清单还没更新；仍然报红，提醒把版本补进 VERIFIED_VERSIONS 与 docs/compatibility.md
   console.error('\n[privmask] 上游新版本的宿主缝都在（可直接用），但版本尚未纳入已验证清单：'
-    + targets.join(', ') + '\n  处理：把版本加进 tools/dsh-compat-check.mjs 的 VERIFIED_VERSIONS 与 README 的版本适配段');
+    + targets.join(', ') + '\n  处理：把版本加进 tools/dsh-compat-check.mjs 的 VERIFIED_VERSIONS 与 `docs/compatibility.md` 的版本适配段');
   process.exitCode = 1;
 } else {
   console.log('\n[privmask] 适配自检通过：必需缝全部存在；源码已留存于 ' + relative(ROOT, CACHE_DIR) + '/（不进提交）');

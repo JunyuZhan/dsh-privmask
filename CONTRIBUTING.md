@@ -60,12 +60,12 @@ node test/docx-test.js        # docx 本地脱敏
    - `client-src/PrivmaskCard.tsx` 的 `PLUGIN_VERSION`（accuracy 测试强制与 `package.json` 一致）
    - 跑一次 `npm run build` 重新生成 `lib/client.js`（产物里的版本号随源码走）
    - `CHANGELOG.md`（Keep a Changelog 格式）
-   - `README.md` 的测试计数（如涉及）
+   - `docs/development.md` 的测试计数（如涉及）
 
 ## dsh 适配约定
 
 - 宿主缝（事件名、服务名、客户端模块 id）变更时：先跑 `npm run dsh:compat <新版本>`
-  看缝是否还齐，再改代码；核对结论写进 `docs/dev/dsh-research.md` 与 README 的版本适配段。
+  看缝是否还齐，再改代码；核对结论写进 `docs/dev/dsh-research.md` 与 `docs/compatibility.md` 的版本适配段。
 - `.dsh-versions/` 是各版本源码的本机留存目录（gitignore），不提交、不进包；
   新增依赖的宿主包时把它加进 `tools/dsh-compat-check.mjs` 的 `PACKAGES` 列表。
 - 该脚本需要联网，**不要**挂进 `prepublishOnly`（发布必须能离线跑通）。
@@ -106,5 +106,5 @@ npm publish --registry=https://registry.npmjs.org --auth-type=web
 - [ ] 改了 `client-src/` 时已重新构建产物（`npm run build:check` 通过）
 - [ ] 新增/修改的规则有对应回归用例（虚构数据）
 - [ ] 幂等与还原往返未破坏
-- [ ] CHANGELOG 与 README 计数同步
+- [ ] CHANGELOG 与文档计数同步
 - [ ] 提交信息符合仓库风格

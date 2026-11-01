@@ -25,7 +25,7 @@
   下**都不可达**，这不是探测代码写错，而是 include 可见性限制。
 - 想在浏览器端还原用户消息，要么 dsh 官方开放会话读取/改写缝（把控制器提升到
   profile 可见层或提供事件改写缝），要么提供 host→browser 的占位符映射 RPC。
-  在官方能力落地前，privmask 保持“日志与界面一致为占位符”并如实声明（README 已知限制）。
+  在官方能力落地前，privmask 保持“日志与界面一致为占位符”并如实声明（见 `docs/limitations.md`）。
 
 ## 2. 请求管线与插件可挂接的缝
 
@@ -235,7 +235,7 @@ profile 的 `cordis.patch.yml` 出现 `redactNames: false` 等落盘值；dsh 0.
    监听器不会触发（静默降级，不报错）。
 
 **证据口径**：以上为编译产物 + 类型声明的源码逐缝核对——本机没有 0.2.x 真机宿主，故未做真机验证；
-0.1.7-rc.2 的真机结论仍以 §5.4 为准。0.2.x 声明建议按 README 的冒烟清单各跑一次 `npm run smoke`。
+0.1.7-rc.2 的真机结论仍以 §5.4 为准。0.2.x 声明建议按 `docs/development.md` 的冒烟清单各跑一次 `npm run smoke`。
 
 ## 6. 后续改进方向（按优先级）
 
@@ -243,8 +243,8 @@ profile 的 `cordis.patch.yml` 出现 `redactNames: false` 等落盘值；dsh 0.
    在此之前保持界面占位符并如实声明，避免“看似还原实则不还原”。
 2. **推理友好**：保持默认“保留案号/日期/金额/路径”，工具 schema 遮罩提供开关；
    避免把长 hex/SHA、内网 IP 等对编码任务有语义的内容默认吞掉造成推理降级
-   （现有 `longTokens`/`redactPaths` 开关可调，README 已给取舍说明）。
-3. **文件脱敏**：docx 本地脱敏 MVP 已落地（见 README）；
+   （现有 `longTokens`/`redactPaths` 开关可调，`docs/configuration.md` 已给取舍说明）。
+3. **文件脱敏**：docx 本地脱敏 MVP 已落地（见 `docs/tools.md`）；
    PDF 与图片 OCR 作为独立里程碑，继续前先明确“抽取→遮罩→回写/生成副本”的
    保真与不可逆边界。
 4. **UX**：卡片已标注适配版本与简版责任声明；按钮真实可用性由数据层单测、

@@ -35,8 +35,8 @@ jobs:
             "" \
             "处理步骤：" \
             "1. \`node tools/dsh-compat-check.mjs <新版本>\` 看逐缝结果；" \
-            "2. 缝都在 → 把版本补进 \`tools/dsh-compat-check.mjs\` 的 \`VERIFIED_VERSIONS\` 与 README 版本适配段；缺关键缝 → 按提示适配代码；" \
-            "3. 关键 API（尤其设置 API）换形态时，按 \`docs/dsh-research.md\` 的记录同步客户端/宿主侧软探测。" \
+            "2. 缝都在 → 把版本补进 \`tools/dsh-compat-check.mjs\` 的 \`VERIFIED_VERSIONS\` 与 \`docs/compatibility.md\` 版本适配段；缺关键缝 → 按提示适配代码；" \
+            "3. 关键 API（尤其设置 API）换形态时，按 \`docs/dev/dsh-research.md\` 的记录同步客户端/宿主侧软探测。" \
             "")"
           EXISTING="$(gh issue list --state open --search "\"$TITLE\" in:title" --json number -q '.[0].number')"
           if [ -n "$EXISTING" ]; then
