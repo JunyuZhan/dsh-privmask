@@ -78,6 +78,15 @@ node tools/smoke.mjs --profile desktop --dsh "/Applications/DeepSeek Harness.app
 git tag v<版本> && git push origin v<版本>
 ```
 
+发版流程里还有一步**刷新自有市场索引**：`npm publish` 完成后跑
+
+```sh
+npm run market:index   # 读取 npm 上的版本/发布时间，重写 market/index.json
+git add market/index.json && git commit -m "chore: 刷新市场索引（v<版本>）" && git push
+```
+
+这样「发现」里添加本项目索引源的用户能立刻看到新版本（jsDelivr 有缓存，通常几分钟内刷新）。
+
 完整发布步骤（版本号/CHANGELOG/Release/用户侧升级）见
 [CONTRIBUTING.md「发布流程」](../CONTRIBUTING.md#发布流程维护者)。
 

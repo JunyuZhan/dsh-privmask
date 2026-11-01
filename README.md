@@ -28,6 +28,9 @@ DeepSeek Harness 本地脱敏插件：请求发往云端大模型之前，把密
 **DSH Desktop（推荐，绝大多数用户）**：打开侧栏「插件」→「添加插件」→ 输入 `dsh-privmask`
 →「安装」→「立即启用」，然后按提示重启 DSH Desktop；「设置 → 插件」里会出现「隐私保护」页签。
 
+**插件市场（发现）**：插件页启用「自定义插件市场」→「发现」→ 添加索引源
+`https://cdn.jsdelivr.net/gh/JunyuZhan/dsh-privmask@main/market/index.json`
+→ 搜索 `dsh-privmask` 一键安装。
 **让 agent 帮你装**：把下面这句发给你的 agent（DSH 内置 agent，或任何能执行命令的编码 agent）：
 
 > 帮我安装 DeepSeek Harness 脱敏插件 `dsh-privmask` 并验证：「设置 → 插件」出现「隐私保护」页签、

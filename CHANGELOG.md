@@ -3,15 +3,24 @@
 本项目的所有重要变更都会记录在此文件。
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [Unreleased]
+## [0.2.51] - 2026-11-01
+
+### 插件市场
+
+- **新增项目自有市场索引 `market/index.json`**（DSH 插件市场索引格式 1，已用官方校验器
+  `parseMarketIndex` 验证）：用户在插件页「发现」里添加索引源
+  `https://cdn.jsdelivr.net/gh/JunyuZhan/dsh-privmask@main/market/index.json` 后，可直接搜索
+  `dsh-privmask` 一键安装；文档同时给出 DSH.SO 社区市场的索引源。索引由
+  `npm run market:index`（`tools/build-market-index.mjs`）从 npm 版本与发布时间生成，
+  发版后刷新，不依赖第三方收录。
+- 仓库已加 `dsh-plugin` topic，进入 DSH.SO 注册表的自动发现队列；其 submit API 当前受上游
+  GitHub 限流（429），提交任务稍后重试（不影响 topic 自动发现）。
 
 ### 文档
 
-- **安装新增「插件市场」入口**：DSH Desktop 的插件页启用「自定义插件市场」后，可在「发现」里搜索
-  `dsh-privmask` 一键安装；文档写清了索引源（DSH.SO `https://cdn.dsh.so/market/index.json`）、
-  收录状态与搜不到时的回退（界面按包名安装 / 让 agent 安装）。
-- 仓库已加 `dsh-plugin` topic，进入 DSH.SO 注册表的自动发现队列；其 submit API 当前受上游
-  GitHub 限流（429），提交任务稍后重试，不影响 topic 自动发现。收录与生效时间由第三方控制。
+- README「安装」与 `docs/install.md` 补插件市场一键安装路径（自有索引 / DSH.SO 索引、
+  启用「自定义插件市场」步骤、搜不到时的回退），原「方式一…四」顺延为「方式二…五」。
+- `docs/development.md` 发布流程补「发版后刷新市场索引」一步。
 
 ## [0.2.50] - 2026-11-01
 

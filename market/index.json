@@ -1,0 +1,120 @@
+{
+  "format": 1,
+  "title": {
+    "en": "dsh-privmask",
+    "zh": "dsh-privmask 插件市场索引"
+  },
+  "description": {
+    "en": "Market index for dsh-privmask (DeepSeek Harness local redaction plugin).",
+    "zh": "dsh-privmask（DeepSeek Harness 本地脱敏插件）的市场索引。"
+  },
+  "metadata": {
+    "categories": {
+      "tools": {
+        "title": {
+          "en": "Tools",
+          "zh": "工具"
+        }
+      }
+    },
+    "labels": {},
+    "sortKeys": {}
+  },
+  "plugins": [
+    {
+      "name": "dsh-privmask",
+      "title": {
+        "en": "dsh-privmask",
+        "zh": "隐私保护 dsh-privmask"
+      },
+      "description": {
+        "en": "Local redaction for DeepSeek Harness: masks secrets, PII and Chinese entities before requests leave the machine; sessions and tool results are masked too, with local restore in model output.",
+        "zh": "DeepSeek Harness 本地脱敏插件：请求上云前遮罩密钥、PII 与中文实体，用户输入与工具结果落盘前同样遮罩，模型输出里的占位符在本地还原。"
+      },
+      "author": "JunyuZhan",
+      "homepage": "https://github.com/JunyuZhan/dsh-privmask#readme",
+      "repository": {
+        "url": "https://github.com/JunyuZhan/dsh-privmask"
+      },
+      "metadata": {
+        "category": "tools",
+        "keywords": [
+          "privacy",
+          "pii",
+          "redaction",
+          "security",
+          "desensitization",
+          "deepseek-harness"
+        ],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.2.50",
+          "publishTimestamp": 1793521433,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {}
+        },
+        {
+          "version": "0.2.49",
+          "publishTimestamp": 1793520255,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {}
+        },
+        {
+          "version": "0.2.48",
+          "publishTimestamp": 1793508697,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {}
+        },
+        {
+          "version": "0.2.47",
+          "publishTimestamp": 1790298752,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {}
+        },
+        {
+          "version": "0.2.45",
+          "publishTimestamp": 1790072395,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {}
+        },
+        {
+          "version": "0.2.44",
+          "publishTimestamp": 1790070523,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {}
+        },
+        {
+          "version": "0.2.43",
+          "publishTimestamp": 1790069247,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {}
+        },
+        {
+          "version": "0.2.41",
+          "publishTimestamp": 1788616708,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {}
+        }
+      ]
+    }
+  ]
+}

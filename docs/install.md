@@ -14,8 +14,11 @@ DSH Desktop 的插件页支持插件市场索引（实验性组合包「自定�
 的自动发现队列（收录审核与索引刷新由第三方控制，审核期间在「发现」里搜不到属正常）。
 
 1. 侧栏**插件** → 实验性插件旁的**更多** → 启用**自定义插件市场**（插件页随后出现**发现**标签）；
-2. 切到**发现**；若还没有索引源，点**添加索引源**填 `https://cdn.dsh.so/market/index.json`
-   （DSH.SO 社区市场，多数桌面版已预置）；
+2. 切到**发现**；若还没有索引源，点**添加索引源**，填其一：
+   - **本项目自有索引**（随版本更新，不等第三方收录，推荐先用这个）：
+     `https://cdn.jsdelivr.net/gh/JunyuZhan/dsh-privmask@main/market/index.json`
+     （不可达时用 `https://raw.githubusercontent.com/JunyuZhan/dsh-privmask/main/market/index.json`）；
+   - **DSH.SO 社区市场**（第三方，收录审核由对方控制）：`https://cdn.dsh.so/market/index.json`；
 3. 搜索 `dsh-privmask` → **安装** → 确认 → **立即启用** → 重启 DSH Desktop。
 
 该索引由第三方维护，收录与刷新时间不受我们控制；搜不到或急着用时，直接走
