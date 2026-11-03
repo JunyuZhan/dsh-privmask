@@ -5,6 +5,10 @@
 
 ## [未发布]
 
+### 安全扫描
+
+- **`lib/index.js` 的 `execFileAsync` 改为显式 Promise 包装**（原为 `promisify(execFile)`）：行为不变——成功 resolve `{ stdout, stderr }`、失败 reject，`timeout`/`maxBuffer`/`signal` 原样透传，OCR 失败路径的 `shortError(error)` 仍只读 `error.message`；测试 AB1/AB1b（成功）与 AB2/AB3（退出码非零）覆盖两条路径。动机是第三方市场的静态安全扫描（dsh.so）把 `promisify(execFile)` 判为「导入 child_process 但从未调用」的警告级发现——扫描器不穿透 `promisify` 包装；改为直接调用后该项告警消失。运行时行为与对外 API 无变化；告警随 npm 包重新发布后的新 tarball 生效。
+
 ### 清理
 
 - **删除 `lib/policy.js`**（strict / balanced / permissive 的 `shouldRedact()` 与
